@@ -24,6 +24,11 @@ async function sha256(message: string): Promise<string> {
 }
 
 // --- FUNÇÕES HELPER PARA O DATALAYER ---
+// Função para gerar event_id único para desduplicação
+const generateEventId = () => {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2);
+};
+
 // Cada função tem a responsabilidade única de enviar um evento padronizado para o dataLayer.
 
 /**
@@ -35,9 +40,13 @@ const trackViewContent = (viewContentHasBeenTracked) => {
     return; // Se já foi disparado, não faz nada.
   }
 
+  // Gerar event_id único para desduplicação
+  const eventId = generateEventId();
+  
   window.dataLayer = window.dataLayer || [];
   window.dataLayer.push({
     event: 'view_content',
+    event_id: eventId, // Adicionar event_id para desduplicação
     ecommerce: {
       items: [{
         item_id: '6080425',
@@ -51,6 +60,7 @@ const trackViewContent = (viewContentHasBeenTracked) => {
   
   if (META_CONFIG.TRACKING.enableDebugLogs) {
     console.log('DataLayer Push: view_content (disparado uma única vez)');
+    console.log('🔑 Event ID:', eventId);
   }
   
   viewContentHasBeenTracked.current = true; // Ativa a trava.
@@ -61,9 +71,13 @@ const trackViewContent = (viewContentHasBeenTracked) => {
  * @param {object} userData - Os dados capturados do formulário de pré-checkout.
  */
 const trackCheckout = async (userData) => {
+  // Gerar event_id único para desduplicação
+  const eventId = generateEventId();
+  
   window.dataLayer = window.dataLayer || [];
   window.dataLayer.push({
     event: 'initiate_checkout',
+    event_id: eventId, // Adicionar event_id para desduplicação
     ecommerce: {
       items: [{
         item_id: '6080425',
@@ -74,11 +88,12 @@ const trackCheckout = async (userData) => {
       }],
     },
     // Anexa os dados do usuário para serem usados pelo GTM
-    user_data: userData 
+    user_data: userData
   });
   
   if (META_CONFIG.TRACKING.enableDebugLogs) {
     console.log('DataLayer Push: initiate_checkout com dados do usuário', userData);
+    console.log('🔑 Event ID:', eventId);
   }
 
   // Preparar dados avançados para Meta com hash SHA-256
@@ -159,6 +174,7 @@ const trackCheckout = async (userData) => {
       value: 39.90,
       currency: 'BRL',
       num_items: 1,
+      eventID: eventId, // Adicionar eventID para desduplicação (Facebook usa eventID)
       // Dados do usuário para enriquecimento (com hash e plain text)
       user_data: metaUserData
     };
@@ -168,6 +184,7 @@ const trackCheckout = async (userData) => {
     if (META_CONFIG.TRACKING.enableDebugLogs) {
       console.log('✅ Facebook Pixel: InitiateCheckout enviado com dados enriquecidos');
       console.log('📊 Dados formatados para Meta:', metaUserData);
+      console.log('🔑 Facebook Event ID:', eventId);
     }
   } else {
     if (META_CONFIG.TRACKING.enableDebugLogs) {
@@ -266,12 +283,18 @@ const loadFacebookPixel = () => {
       
       // Inicializar o Pixel com o ID da configuração
       if (typeof fbq !== 'undefined') {
+        // Gerar event_id único para PageView
+        const pageViewEventId = generateEventId();
+        
         fbq('init', META_CONFIG.PIXEL_ID);
-        fbq('track', 'PageView');
+        fbq('track', 'PageView', {}, {
+          eventID: pageViewEventId // Adicionar eventID para desduplicação
+        });
         
         if (META_CONFIG.TRACKING.enableDebugLogs) {
           console.log('✅ Facebook Pixel inicializado e PageView trackado');
           console.log('📊 Pixel ID:', META_CONFIG.PIXEL_ID);
+          console.log('🔑 PageView Event ID:', pageViewEventId);
         }
       }
     };

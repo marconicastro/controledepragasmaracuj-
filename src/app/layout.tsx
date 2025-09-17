@@ -39,6 +39,7 @@ export default function RootLayout({
       <head>
         <meta name="facebook-domain-verification" content="99n94jfb79pk0saheuda6r6xjx5ya1" />
 
+
         {/* SCRIPT DE PROTEÇÃO CONTRA CÓPIA E SELEÇÃO */}
         <Script
           id="protection-script"
