@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
+import { getAllTrackingParams } from '@/lib/cookies';
 
 declare global {
   interface Window {
@@ -31,12 +32,22 @@ export default function GoogleTagManager({ gtmId = 'GTM-567XZCDX' }: GoogleTagMa
       window.gtag('js', new Date());
       window.gtag('config', gtmId);
 
-      // Enviar evento page_view quando a rota mudar
-      window.gtag('event', 'page_view', {
-        page_title: document.title,
-        page_location: window.location.href,
-        page_path: pathname,
-      });
+      // Enviar evento page_view com dados completos de rastreamento quando a rota mudar
+      const sendPageView = async () => {
+        const trackingParams = await getAllTrackingParams();
+        
+        window.gtag('event', 'page_view', {
+          page_title: document.title,
+          page_location: window.location.href,
+          page_path: pathname,
+          // Incluir todos os dados de rastreamento para melhor matching
+          user_data: trackingParams
+        });
+        
+        console.log('📍 PageView enviado com dados completos de rastreamento:', trackingParams);
+      };
+
+      sendPageView();
     }
   }, [pathname, gtmId]);
 
