@@ -242,6 +242,58 @@ const trackCheckout = async (userData) => {
   // Enviar com sistema de retry e validação de qualidade
   await sendEventWithRetry('initiate_checkout', eventData);
 
+  // ENVIAR DADOS DIRETAMENTE PARA O SERVER-SIDE (Stape)
+  if (typeof window !== 'undefined') {
+    try {
+      // Enviar dados para o server-side via fetch
+      // NOTA: Substitua SEU_CONTAINER_ID pelo seu ID real do container Stape
+      await fetch('https://collect.stape.io/v2/s/SEU_CONTAINER_ID/event', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          event_name: 'initiate_checkout',
+          event_id: eventId,
+          // Enviar dados no formato que o GTM Server-side espera
+          user_data: {
+            em: metaFormattedData.em,
+            ph: metaFormattedData.ph,
+            fn: metaFormattedData.fn,
+            ln: metaFormattedData.ln,
+            ct: metaFormattedData.ct,
+            st: metaFormattedData.st,
+            zp: metaFormattedData.zp,
+            country: metaFormattedData.country,
+            fbc: metaFormattedData.fbc,
+            fbp: metaFormattedData.fbp,
+            external_id: metaFormattedData.external_id
+          },
+          custom_data: {
+            currency: 'BRL',
+            value: 39.90,
+            items: [{
+              item_id: '6080425',
+              item_name: 'Sistema de Controle de Trips - Maracujá',
+              price: 39.90,
+              quantity: 1,
+            }]
+          }
+        })
+      });
+      
+      console.log('✅ Dados enviados para o server-side com sucesso!');
+      console.log('📊 Dados enviados:', {
+        em: metaFormattedData.em,
+        ph: metaFormattedData.ph,
+        fn: metaFormattedData.fn,
+        ln: metaFormattedData.ln
+      });
+    } catch (error) {
+      console.error('❌ Erro ao enviar dados para o server-side:', error);
+    }
+  }
+
   if (META_CONFIG.TRACKING.enableDebugLogs) {
     console.log('🛒 Initiate Checkout: Enviado com sistema de retry e formato META!');
     console.log('🔑 Event ID:', eventId);
