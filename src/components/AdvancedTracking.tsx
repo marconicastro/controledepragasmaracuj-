@@ -242,12 +242,13 @@ const trackCheckout = async (userData) => {
   // Enviar com sistema de retry e validação de qualidade
   await sendEventWithRetry('initiate_checkout', eventData);
 
-  // ENVIAR DADOS DIRETAMENTE PARA O SERVER-SIDE (Stape)
+  // ENVIAR DADOS DIRETAMENTE PARA O SERVER-SIDE (Stape) - VERSÃO CORRIGIDA
   if (typeof window !== 'undefined') {
     try {
-      // Enviar dados para o server-side via fetch
-      // NOTA: Substitua SEU_CONTAINER_ID pelo seu ID real do container Stape
-      await fetch('https://collect.stape.io/v2/s/GTM-WTL9CQ7W/event', {
+      console.log('🚀 Tentando enviar dados para o server-side...');
+      
+      // Enviar dados para o server-side via fetch - URL alternativa
+      const response = await fetch('https://gtm-GTM-WTL9CQ7W.stape.io/event', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -282,7 +283,15 @@ const trackCheckout = async (userData) => {
         })
       });
       
-      console.log('✅ Dados enviados para o server-side com sucesso!');
+      console.log('✅ Resposta do server-side:', response.status, response.statusText);
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Dados enviados para o server-side com sucesso!', result);
+      } else {
+        console.error('❌ Erro na resposta do server-side:', response.status, response.statusText);
+      }
+      
       console.log('📊 Dados enviados:', {
         em: metaFormattedData.em,
         ph: metaFormattedData.ph,
@@ -291,6 +300,48 @@ const trackCheckout = async (userData) => {
       });
     } catch (error) {
       console.error('❌ Erro ao enviar dados para o server-side:', error);
+      
+      // Tentar URL alternativa
+      try {
+        console.log('🔄 Tentando URL alternativa...');
+        const response2 = await fetch('https://collect.stape.io/v2/s/GTM-WTL9CQ7W/event', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            event_name: 'initiate_checkout',
+            event_id: eventId,
+            user_data: {
+              em: metaFormattedData.em,
+              ph: metaFormattedData.ph,
+              fn: metaFormattedData.fn,
+              ln: metaFormattedData.ln,
+              ct: metaFormattedData.ct,
+              st: metaFormattedData.st,
+              zp: metaFormattedData.zp,
+              country: metaFormattedData.country,
+              fbc: metaFormattedData.fbc,
+              fbp: metaFormattedData.fbp,
+              external_id: metaFormattedData.external_id
+            },
+            custom_data: {
+              currency: 'BRL',
+              value: 39.90,
+              items: [{
+                item_id: '6080425',
+                item_name: 'Sistema de Controle de Trips - Maracujá',
+                price: 39.90,
+                quantity: 1,
+              }]
+            }
+          })
+        });
+        
+        console.log('✅ URL alternativa funcionou!', response2.status);
+      } catch (error2) {
+        console.error('❌ URL alternativa também falhou:', error2);
+      }
     }
   }
 
