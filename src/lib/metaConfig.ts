@@ -17,17 +17,17 @@ export const META_CONFIG = {
   // Configurações de Rastreamento
   TRACKING: {
     // Habilitar/Desabilitar rastreamento específico
-    enablePageView: true,
+    enablePageView: false, // Gerenciado pelo GTM
     enableViewContent: true,
     enableInitiateCheckout: true,
     enablePurchase: true,
     enableLead: true,
     
     // Delay para view_content (em milissegundos)
-    viewContentDelay: 15000,
+    viewContentDelay: 1000,
     
     // Habilitar console logs para depuração
-    enableDebugLogs: process.env.NODE_ENV === 'development',
+    enableDebugLogs: true, // Habilitado para análise
   },
   
   // Configurações de Qualidade para Meta EQM

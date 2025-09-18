@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
+import { getAllTrackingParams, initializeTracking } from '@/lib/cookies';
 
 declare global {
   interface Window {
@@ -18,6 +19,9 @@ export default function GoogleTagManager({ gtmId = 'GTM-567XZCDX' }: GoogleTagMa
   const pathname = usePathname();
 
   useEffect(() => {
+    // Inicializar captura de parâmetros de rastreamento primeiro
+    initializeTracking();
+    
     // Inicializar dataLayer se não existir
     if (typeof window !== 'undefined') {
       window.dataLayer = window.dataLayer || [];
@@ -31,12 +35,26 @@ export default function GoogleTagManager({ gtmId = 'GTM-567XZCDX' }: GoogleTagMa
       window.gtag('js', new Date());
       window.gtag('config', gtmId);
 
-      // Enviar evento page_view quando a rota mudar
-      window.gtag('event', 'page_view', {
-        page_title: document.title,
-        page_location: window.location.href,
-        page_path: pathname,
-      });
+      // Enviar evento page_view com dados completos de rastreamento quando a rota mudar
+      const sendPageView = async () => {
+        const trackingParams = await getAllTrackingParams();
+        
+        // Gerar event_id consistente para correlação
+        const eventId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+        
+        window.gtag('event', 'page_view', {
+          page_title: document.title,
+          page_location: window.location.href,
+          page_path: pathname,
+          event_id: eventId, // Adicionar event_id para correlação
+          // Incluir todos os dados de rastreamento para melhor matching
+          user_data: trackingParams
+        });
+        
+        console.log('📍 PageView enviado com event_id:', eventId, 'e dados completos:', trackingParams);
+      };
+
+      sendPageView();
     }
   }, [pathname, gtmId]);
 
