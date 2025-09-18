@@ -1,7 +1,6 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import META_CONFIG, { formatUserDataForMeta, validateMetaConfig } from '@/lib/metaConfig';
-import { getAllTrackingParams } from '@/lib/cookies';
 
 // --- FUNÇÕES HELPER PARA HASH SHA-256 ---
 // Função para criar hash SHA-256 (necessária para Meta Conversions API)
@@ -35,18 +34,14 @@ const generateEventId = () => {
 /**
  * Dispara o evento 'view_content' para o dataLayer.
  * Utiliza uma trava para garantir que seja disparado apenas uma vez por página.
- * Inclui dados completos de localização e cookies do Facebook para melhor matching.
  */
-const trackViewContent = async (viewContentHasBeenTracked) => {
+const trackViewContent = (viewContentHasBeenTracked) => {
   if (viewContentHasBeenTracked.current) {
     return; // Se já foi disparado, não faz nada.
   }
 
   // Gerar event_id único para desduplicação
   const eventId = generateEventId();
-  
-  // Obter todos os parâmetros de rastreamento (incluindo localização e cookies)
-  const trackingParams = await getAllTrackingParams();
   
   window.dataLayer = window.dataLayer || [];
   window.dataLayer.push({
@@ -60,15 +55,12 @@ const trackViewContent = async (viewContentHasBeenTracked) => {
         quantity: 1,
         currency: 'BRL'
       }]
-    },
-    // Incluir todos os dados de rastreamento para melhor matching
-    user_data: trackingParams
+    }
   });
   
   if (META_CONFIG.TRACKING.enableDebugLogs) {
     console.log('DataLayer Push: view_content (disparado uma única vez)');
     console.log('🔑 Event ID:', eventId);
-    console.log('📍 Dados completos de rastreamento:', trackingParams);
   }
   
   viewContentHasBeenTracked.current = true; // Ativa a trava.
@@ -239,8 +231,8 @@ export default function AdvancedTracking() {
     
     // Dispara o view_content após o tempo configurado, mas apenas se a trava permitir.
     if (META_CONFIG.TRACKING.enableViewContent) {
-      const timer = setTimeout(async () => {
-        await trackViewContent(viewContentHasBeenTracked);
+      const timer = setTimeout(() => {
+        trackViewContent(viewContentHasBeenTracked);
       }, META_CONFIG.TRACKING.viewContentDelay);
 
       // Expondo as funções na janela global para serem chamadas pelo pré-checkout.
@@ -291,14 +283,18 @@ const loadFacebookPixel = () => {
       
       // Inicializar o Pixel com o ID da configuração
       if (typeof fbq !== 'undefined') {
-        fbq('init', META_CONFIG.PIXEL_ID);
+        // Gerar event_id único para PageView
+        const pageViewEventId = generateEventId();
         
-        // REMOVIDO: PageView automático para evitar duplicação com GTM
-        // O GTM já está tratando os page_views através do GoogleTagManager component
+        fbq('init', META_CONFIG.PIXEL_ID);
+        fbq('track', 'PageView', {}, {
+          eventID: pageViewEventId // Adicionar eventID para desduplicação
+        });
         
         if (META_CONFIG.TRACKING.enableDebugLogs) {
-          console.log('✅ Facebook Pixel inicializado (PageView removido para evitar duplicação)');
+          console.log('✅ Facebook Pixel inicializado e PageView trackado');
           console.log('📊 Pixel ID:', META_CONFIG.PIXEL_ID);
+          console.log('🔑 PageView Event ID:', pageViewEventId);
         }
       }
     };

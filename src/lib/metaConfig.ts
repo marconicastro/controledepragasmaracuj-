@@ -17,7 +17,7 @@ export const META_CONFIG = {
   // Configurações de Rastreamento
   TRACKING: {
     // Habilitar/Desabilitar rastreamento específico
-    enablePageView: false, // Desativado para evitar duplicação com GTM
+    enablePageView: true,
     enableViewContent: true,
     enableInitiateCheckout: true,
     enablePurchase: true,

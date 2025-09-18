@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, X, AlertTriangle, Clock, Shield, Star, Rocket, Phone, Mail, TrendingUp, Target, Zap, Award, Users, DollarSign, ArrowRight, PlayCircle, Download } from 'lucide-react';
 import PreCheckoutModal from '@/components/PreCheckoutModal';
-import { getFacebookCookies, getGoogleClientId } from '@/lib/cookies';
 import META_CONFIG from '@/lib/metaConfig';
 
 export default function App() {
@@ -56,9 +55,11 @@ export default function App() {
     console.log('Email:', formData.email);
     console.log('Telefone:', formData.phone);
 
-    // Capturar cookies necessários usando os utilitários
-    const { fbc, fbp } = getFacebookCookies();
-    const clientId = getGoogleClientId();
+    // Capturar cookies necessários
+    const fbp = getCookie('_fbp');
+    const fbc = getCookie('_fbc');
+    const gaCookie = getCookie('_ga');
+    const clientId = gaCookie ? gaCookie.split('.').slice(2).join('.') : null;
 
     // Construir URL limpa e definitiva com URLSearchParams
     const baseUrl = META_CONFIG.HOTMART.checkoutUrl;
@@ -170,6 +171,12 @@ export default function App() {
   const scrollToCheckout = () => {
     document.getElementById('checkout').scrollIntoView({ behavior: 'smooth' });
   };
+
+  function getCookie(name) {
+    if (typeof document === 'undefined') return null;
+    const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+    return match ? match[2] : null;
+  }
 
   // Função principal de checkout (LEGADO - mantida para compatibilidade)
   const handleHotmartCheckout = (event) => {
