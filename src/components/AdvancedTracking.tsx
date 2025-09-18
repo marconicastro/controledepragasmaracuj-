@@ -144,10 +144,32 @@ const trackViewContent = async (viewContentHasBeenTracked) => {
   // Obter todos os parâmetros de rastreamento (incluindo FBC, FBP, etc.)
   const trackingParams = await getAllTrackingParams();
   
+  // Garantir captura do FBC - TENTATIVA ADICIONAL
+  let fbc = trackingParams.fbc;
+  
+  // Se não tiver FBC, tentar capturar da URL novamente
+  if (!fbc && typeof window !== 'undefined') {
+    const urlParams = new URLSearchParams(window.location.search);
+    const fbclid = urlParams.get('fbclid');
+    
+    if (fbclid) {
+      // Criar FBC no formato correto
+      const timestamp = Date.now();
+      fbc = `fb.1.${timestamp}.${fbclid}`;
+      
+      // Salvar no cookie para futuros eventos
+      const expirationDate = new Date();
+      expirationDate.setDate(expirationDate.getDate() + 90);
+      document.cookie = `_fbc=${fbc}; expires=${expirationDate.toUTCString()}; path=/; domain=${window.location.hostname}; SameSite=Lax`;
+      
+      console.log('🎯 FBC capturado e salvo:', fbc);
+    }
+  }
+  
   // Usar o MESMO formato do InitiateCheckout para consistência
   const metaFormattedData = {
     // ✅ Dados de rastreamento para matching (iguais ao InitiateCheckout)
-    fbc: trackingParams.fbc,
+    fbc: fbc, // Usar FBC garantido
     fbp: trackingParams.fbp,
     ga_client_id: trackingParams.ga_client_id,
     external_id: trackingParams.external_id,
@@ -185,6 +207,7 @@ const trackViewContent = async (viewContentHasBeenTracked) => {
     console.log('📍 Dados de localização (ALTA QUALIDADE):', locationData);
     console.log('📊 Dados formatados (META padrão):', metaFormattedData);
     console.log('✅ Formato consistente com InitiateCheckout');
+    console.log('🎯 FBC status:', fbc ? '✅ Capturado' : '❌ Não encontrado');
   }
   
   viewContentHasBeenTracked.current = true; // Ativa a trava.
@@ -242,45 +265,51 @@ const trackCheckout = async (userData) => {
   // Enviar com sistema de retry e validação de qualidade
   await sendEventWithRetry('initiate_checkout', eventData);
 
-  // ENVIAR DADOS DIRETAMENTE PARA O SERVER-SIDE (Stape) - VERSÃO CORRIGIDA
+  // ENVIAR DADOS DIRETAMENTE PARA O SERVER-SIDE (Stape) - VERSÃO OTIMIZADA PARA FACEBOOK PIXEL
   if (typeof window !== 'undefined') {
     try {
       console.log('🚀 Tentando enviar dados para o server-side...');
       
-      // Enviar dados para o server-side via fetch - URL alternativa
+      // Preparar dados no formato EXATO que o Facebook Pixel espera no server-side
+      const serverSideData = {
+        event_name: 'InitiateCheckout', // Nome do evento padrão do Facebook
+        event_id: eventId,
+        pixel_id: '714277868320104', // ID do Pixel do Facebook
+        user_data: {
+          // Dados do usuário no formato que o Facebook Pixel reconhece
+          em: metaFormattedData.em,
+          ph: metaFormattedData.ph,
+          fn: metaFormattedData.fn,
+          ln: metaFormattedData.ln,
+          ct: metaFormattedData.ct,
+          st: metaFormattedData.st,
+          zp: metaFormattedData.zp,
+          country: metaFormattedData.country,
+          client_ip_address: '', // Será preenchido pelo server-side
+          client_user_agent: navigator.userAgent,
+          fbc: metaFormattedData.fbc,
+          fbp: metaFormattedData.fbp,
+          external_id: metaFormattedData.external_id
+        },
+        custom_data: {
+          currency: 'BRL',
+          value: 39.90,
+          content_type: 'product',
+          contents: [{
+            id: '6080425',
+            quantity: 1,
+            item_price: 39.90
+          }]
+        }
+      };
+      
+      // Enviar dados para o server-side via fetch - URL principal
       const response = await fetch('https://gtm-GTM-WTL9CQ7W.stape.io/event', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          event_name: 'initiate_checkout',
-          event_id: eventId,
-          // Enviar dados no formato que o GTM Server-side espera
-          user_data: {
-            em: metaFormattedData.em,
-            ph: metaFormattedData.ph,
-            fn: metaFormattedData.fn,
-            ln: metaFormattedData.ln,
-            ct: metaFormattedData.ct,
-            st: metaFormattedData.st,
-            zp: metaFormattedData.zp,
-            country: metaFormattedData.country,
-            fbc: metaFormattedData.fbc,
-            fbp: metaFormattedData.fbp,
-            external_id: metaFormattedData.external_id
-          },
-          custom_data: {
-            currency: 'BRL',
-            value: 39.90,
-            items: [{
-              item_id: '6080425',
-              item_name: 'Sistema de Controle de Trips - Maracujá',
-              price: 39.90,
-              quantity: 1,
-            }]
-          }
-        })
+        body: JSON.stringify(serverSideData)
       });
       
       console.log('✅ Resposta do server-side:', response.status, response.statusText);
@@ -292,12 +321,37 @@ const trackCheckout = async (userData) => {
         console.error('❌ Erro na resposta do server-side:', response.status, response.statusText);
       }
       
-      console.log('📊 Dados enviados:', {
+      console.log('📊 Dados enviados para Facebook Pixel:', {
         em: metaFormattedData.em,
         ph: metaFormattedData.ph,
         fn: metaFormattedData.fn,
-        ln: metaFormattedData.ln
+        ln: metaFormattedData.ln,
+        ct: metaFormattedData.ct,
+        st: metaFormattedData.st,
+        zp: metaFormattedData.zp,
+        country: metaFormattedData.country
       });
+      
+      // Também enviar via dataLayer para garantir que o GTM capture
+      window.dataLayer.push({
+        event: 'initiate_checkout',
+        event_id: eventId,
+        user_data: metaFormattedData,
+        facebook_pixel_data: {
+          event_name: 'InitiateCheckout',
+          user_data: {
+            em: metaFormattedData.em,
+            ph: metaFormattedData.ph,
+            fn: metaFormattedData.fn,
+            ln: metaFormattedData.ln,
+            ct: metaFormattedData.ct,
+            st: metaFormattedData.st,
+            zp: metaFormattedData.zp,
+            country: metaFormattedData.country
+          }
+        }
+      });
+      
     } catch (error) {
       console.error('❌ Erro ao enviar dados para o server-side:', error);
       
@@ -310,8 +364,9 @@ const trackCheckout = async (userData) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            event_name: 'initiate_checkout',
+            event_name: 'InitiateCheckout',
             event_id: eventId,
+            pixel_id: '714277868320104',
             user_data: {
               em: metaFormattedData.em,
               ph: metaFormattedData.ph,
@@ -321,6 +376,8 @@ const trackCheckout = async (userData) => {
               st: metaFormattedData.st,
               zp: metaFormattedData.zp,
               country: metaFormattedData.country,
+              client_ip_address: '',
+              client_user_agent: navigator.userAgent,
               fbc: metaFormattedData.fbc,
               fbp: metaFormattedData.fbp,
               external_id: metaFormattedData.external_id
@@ -328,11 +385,11 @@ const trackCheckout = async (userData) => {
             custom_data: {
               currency: 'BRL',
               value: 39.90,
-              items: [{
-                item_id: '6080425',
-                item_name: 'Sistema de Controle de Trips - Maracujá',
-                price: 39.90,
+              content_type: 'product',
+              contents: [{
+                id: '6080425',
                 quantity: 1,
+                item_price: 39.90
               }]
             }
           })
@@ -346,14 +403,14 @@ const trackCheckout = async (userData) => {
   }
 
   if (META_CONFIG.TRACKING.enableDebugLogs) {
-    console.log('🛒 Initiate Checkout: Enviado com sistema de retry e formato META!');
+    console.log('🛒 Initiate Checkout: Enviado com formato OTIMIZADO para Facebook Pixel!');
     console.log('🔑 Event ID:', eventId);
     console.log('📊 Dados formatados (META padrão):', metaFormattedData);
     console.log('🌍 Dados geográficos usados:', locationData);
-    console.log('📈 Expectativa: Score deve subir para 8.0+ com dados completos do formulário');
+    console.log('📈 Expectativa: Score deve subir para 8.5+ com dados completos enviados diretamente ao Facebook Pixel');
     
     // Log de confirmação do formato correto
-    console.log('🎯 Dados do formulário sendo enviados:');
+    console.log('🎯 Dados do formulário enviados para Facebook Pixel:');
     console.log('   - Email (em):', metaFormattedData.em);
     console.log('   - Telefone (ph):', metaFormattedData.ph);
     console.log('   - Nome (fn):', metaFormattedData.fn);
@@ -362,6 +419,10 @@ const trackCheckout = async (userData) => {
     console.log('   - Estado (st):', metaFormattedData.st);
     console.log('   - CEP (zp):', metaFormattedData.zp);
     console.log('   - País (country):', metaFormattedData.country);
+    console.log('   - FBC (fbc):', metaFormattedData.fbc);
+    console.log('   - FBP (fbp):', metaFormattedData.fbp);
+    console.log('   - External ID:', metaFormattedData.external_id);
+    console.log('🚀 Dados enviados via server-side (Stape) e dataLayer para garantir entrega ao Facebook');
   }
 };
 

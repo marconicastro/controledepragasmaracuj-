@@ -40,10 +40,35 @@ export default function GoogleTagManager({ gtmId = 'GTM-567XZCDX' }: GoogleTagMa
         // 2. Obter todos os parâmetros de rastreamento com FBC garantido
         const trackingParams = await getAllTrackingParams();
         
-        // 3. Gerar event_id consistente para correlação
+        // 3. Garantir captura do FBC - TENTATIVA ADICIONAL
+        let fbc = trackingParams.fbc;
+        
+        // Se não tiver FBC, tentar capturar da URL novamente
+        if (!fbc && typeof window !== 'undefined') {
+          const urlParams = new URLSearchParams(window.location.search);
+          const fbclid = urlParams.get('fbclid');
+          
+          if (fbclid) {
+            // Criar FBC no formato correto
+            const timestamp = Date.now();
+            fbc = `fb.1.${timestamp}.${fbclid}`;
+            
+            // Salvar no cookie para futuros eventos
+            const expirationDate = new Date();
+            expirationDate.setDate(expirationDate.getDate() + 90);
+            document.cookie = `_fbc=${fbc}; expires=${expirationDate.toUTCString()}; path=/; domain=${window.location.hostname}; SameSite=Lax`;
+            
+            console.log('🎯 FBC capturado e salvo no PageView:', fbc);
+            
+            // Atualizar trackingParams com o FBC capturado
+            trackingParams.fbc = fbc;
+          }
+        }
+        
+        // 4. Gerar event_id consistente para correlação
         const eventId = Date.now().toString(36) + Math.random().toString(36).substr(2);
         
-        // 4. Enviar PageView com FBC garantido
+        // 5. Enviar PageView com FBC garantido
         window.gtag('event', 'page_view', {
           page_title: document.title,
           page_location: window.location.href,
@@ -53,8 +78,9 @@ export default function GoogleTagManager({ gtmId = 'GTM-567XZCDX' }: GoogleTagMa
           user_data: trackingParams
         });
         
-        console.log('📍 PageView enviado COM FBC:', trackingParams.fbc);
+        console.log('📍 PageView enviado COM FBC:', fbc ? '✅ ' + fbc : '❌ Não encontrado');
         console.log('📊 Dados completos:', trackingParams);
+        console.log('🎯 FBC status no PageView:', fbc ? '✅ Capturado' : '❌ Não encontrado');
       };
 
       // Enviar PageView de forma sincronizada (aguarda FBC)

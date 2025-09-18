@@ -9,7 +9,7 @@
 
 export const META_CONFIG = {
   // ID DO FACEBOOK PIXEL - OBRIGATÓRIO CONFIGURAR
-  PIXEL_ID: '642933108377475', // ← Configurado com o ID real
+  PIXEL_ID: '714277868320104', // ← Configurado com o ID real
   
   // Configurações de Ambiente
   ENVIRONMENT: process.env.NODE_ENV === 'production' ? 'production' : 'development',
