@@ -247,7 +247,7 @@ const trackCheckout = async (userData) => {
     try {
       // Enviar dados para o server-side via fetch
       // NOTA: Substitua SEU_CONTAINER_ID pelo seu ID real do container Stape
-      await fetch('https://collect.stape.io/v2/s/SEU_CONTAINER_ID/event', {
+      await fetch('https://collect.stape.io/v2/s/GTM-WTL9CQ7W/event', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
