@@ -16,36 +16,21 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://chat.z.ai'),
-  title: "Sistema de Controle de Trips - Economize até R$ 5.000 por Hectare",
-  description: "Método validado pela Embrapa para eliminar trips de vez. Sistema de 4 fases que economiza até R$ 5.000 por hectare em defensivos agrícolas.",
-  keywords: ["controle de trips", "trips na soja", "defensivos agrícolas", "Embrapa", "agricultura", "pragas", "soja", "economia agrícola"],
-  authors: [{ name: "Sistema de Controle de Trips" }],
+  title: "Z.ai Code Scaffold - AI-Powered Development",
+  description: "Modern Next.js scaffold optimized for AI-powered development with Z.ai. Built with TypeScript, Tailwind CSS, and shadcn/ui.",
+  keywords: ["Z.ai", "Next.js", "TypeScript", "Tailwind CSS", "shadcn/ui", "AI development", "React"],
+  authors: [{ name: "Z.ai Team" }],
   openGraph: {
-    title: "Sistema de Controle de Trips - Economize até R$ 5.000 por Hectare",
-    description: "Método validado pela Embrapa para eliminar trips de vez. Sistema de 4 fases que economiza até R$ 5.000 por hectare em defensivos agrícolas.",
+    title: "Z.ai Code Scaffold",
+    description: "AI-powered development with modern React stack",
     url: "https://chat.z.ai",
-    siteName: "Sistema de Controle de Trips",
+    siteName: "Z.ai",
     type: "website",
-    images: [
-      {
-        url: "/ebook-logo.webp",
-        width: 400,
-        height: 400,
-        alt: "E-book Sistema de Controle de Trips",
-      },
-    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Sistema de Controle de Trips - Economize até R$ 5.000 por Hectare",
-    description: "Método validado pela Embrapa para eliminar trips de vez. Sistema de 4 fases que economiza até R$ 5.000 por hectare em defensivos agrícolas.",
-    images: ["/ebook-logo.webp"],
-  },
-  other: {
-    "twitter:image": "/ebook-logo.webp",
-    "og:image:width": "400",
-    "og:image:height": "400",
+    title: "Z.ai Code Scaffold",
+    description: "AI-powered development with modern React stack",
   },
 };
 
@@ -55,9 +40,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <head>
-        <GoogleTagManager gtmId="GTM-567XZCDX" />
+        <GoogleTagManager />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}

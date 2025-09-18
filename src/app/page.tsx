@@ -168,10 +168,7 @@ export default function App() {
   };
 
   const scrollToCheckout = () => {
-    const element = document.getElementById('checkout');
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
-    }
+    document.getElementById('checkout').scrollIntoView({ behavior: 'smooth' });
   };
 
   // Função principal de checkout (LEGADO - mantida para compatibilidade)

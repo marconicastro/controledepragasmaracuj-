@@ -74,21 +74,7 @@ const trackCheckout = async (userData) => {
   const eventId = Date.now().toString(36) + Math.random().toString(36).substr(2);
   
   // Tentar obter dados geográficos em cache primeiro (rápido e confiável)
-  let cachedGeoData = getCachedGeographicData();
-  
-  // Se não tivermos dados geográficos em cache, tentar buscar imediatamente
-  if (!cachedGeoData) {
-    console.log('🌍 Cache geográfico vazio, tentando buscar dados frescos...');
-    try {
-      // Importar dinamicamente para evitar circular dependency
-      const { getLocationData } = await import('@/lib/cookies');
-      const freshGeoData = await getLocationData();
-      cachedGeoData = freshGeoData;
-      console.log('✅ Dados geográficos frescos obtidos:', freshGeoData);
-    } catch (error) {
-      console.warn('⚠️ Não foi possível obter dados geográficos frescos:', error);
-    }
-  }
+  const cachedGeoData = getCachedGeographicData();
   
   // Preparar dados no FORMATO META que o Facebook reconhece
   const metaFormattedData = {
@@ -98,11 +84,11 @@ const trackCheckout = async (userData) => {
     fn: userData.firstName,      // Primeiro nome - Facebook entende "fn"
     ln: userData.lastName,       // Sobrenome - Facebook entende "ln"
     
-    // ✅ Dados geográficos - priorizar cache, depois formulário, depois valores padrão
+    // ✅ Dados geográficos - usar cache se disponível, senão usar do formulário
     ct: cachedGeoData?.city || userData.city || '',           // Cidade - Facebook entende "ct"
     st: cachedGeoData?.state || userData.state || '',          // Estado - Facebook entende "st"
     zp: cachedGeoData?.zip || userData.zip || '',            // CEP - Facebook entende "zp"
-    country: cachedGeoData?.country || userData.country || 'BR', // País - Facebook entende "country"
+    country: cachedGeoData?.country || 'BR',                 // País - Facebook entende "country"
     
     // ✅ Dados de rastreamento para matching
     fbc: userData.fbc,
@@ -126,18 +112,7 @@ const trackCheckout = async (userData) => {
       }],
     },
     // ✅ Usar formato META que o Facebook reconhece
-    user_data: metaFormattedData,
-    // ✅ Adicionar dados brutos também para GTM Server-side processar
-    user_data_raw: {
-      email: userData.email,
-      phone: userData.phone,
-      firstName: userData.firstName,
-      lastName: userData.lastName,
-      city: cachedGeoData?.city || userData.city || '',
-      state: cachedGeoData?.state || userData.state || '',
-      zip: cachedGeoData?.zip || userData.zip || '',
-      country: cachedGeoData?.country || userData.country || 'BR'
-    }
+    user_data: metaFormattedData
   });
   
   if (META_CONFIG.TRACKING.enableDebugLogs) {
@@ -147,9 +122,15 @@ const trackCheckout = async (userData) => {
     console.log('🌍 Dados geográficos usados:', cachedGeoData || 'Dados do formulário');
     console.log('✅ Agora Facebook reconhece em, ph, fn, ln!');
     console.log('📈 Expectativa: Score deve subir para 7.0+ com dados do formulário');
-    
-    // Log detalhado dos dados do usuário
-    console.log('📊 Dados do usuário sendo enviados:');
+  }
+
+  // REMOVIDO: Envio direto do Facebook Pixel para evitar conflitos
+  // REMOVIDO: Envio separado do Google Analytics (GTM já gerencia)
+  
+  // Log de confirmação do formato correto
+  if (META_CONFIG.TRACKING.enableDebugLogs) {
+    console.log('🎯 Initiate Checkout: Agora com formato META correto!');
+    console.log('📊 Dados do formulário sendo enviados:');
     console.log('   - Email (em):', userData.email);
     console.log('   - Telefone (ph):', userData.phone);
     console.log('   - Nome (fn):', userData.firstName);
@@ -158,9 +139,6 @@ const trackCheckout = async (userData) => {
       console.log('🌍 Dados geográficos em cache utilizados:', cachedGeoData);
     }
   }
-
-  // REMOVIDO: Envio direto do Facebook Pixel para evitar conflitos
-  // REMOVIDO: Envio separado do Google Analytics (GTM já gerencia)
 };
 
 
@@ -213,7 +191,7 @@ export default function AdvancedTracking() {
 // Garante que o TypeScript entenda o objeto window.advancedTracking.
 declare global {
   interface Window {
-    dataLayer: any[];
+    dataLayer?: any[];
     advancedTracking?: {
       trackCheckout: (userData: any) => Promise<void>;
     };
