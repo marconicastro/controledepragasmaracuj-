@@ -39,6 +39,7 @@ export default function GoogleTagManager({ gtmId = 'GTM-567XZCDX' }: GoogleTagMa
         // Gerar event_id consistente para correlação
         const eventId = Date.now().toString(36) + Math.random().toString(36).substr(2);
         
+        // Enviar para GTM Web (client-side)
         window.gtag('event', 'page_view', {
           page_title: document.title,
           page_location: window.location.href,
@@ -46,6 +47,16 @@ export default function GoogleTagManager({ gtmId = 'GTM-567XZCDX' }: GoogleTagMa
           event_id: eventId, // Adicionar event_id para correlação
           // Incluir todos os dados de rastreamento para melhor matching
           user_data: trackingParams
+        });
+        
+        // Enviar para Server-side via DataLayer
+        window.dataLayer.push({
+          event: 'page_view_server',
+          event_id: eventId,
+          user_data: trackingParams,
+          user_data_raw: trackingParams,
+          page_location: window.location.href,
+          page_title: document.title
         });
         
         console.log(`📍 PageView enviado (tentativa ${retryCount + 1}) com event_id:`, eventId, 'e dados:', trackingParams);

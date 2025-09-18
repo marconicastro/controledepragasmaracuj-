@@ -126,7 +126,18 @@ const trackCheckout = async (userData) => {
       }],
     },
     // ✅ Usar formato META que o Facebook reconhece
-    user_data: metaFormattedData
+    user_data: metaFormattedData,
+    // ✅ Adicionar dados brutos também para GTM Server-side processar
+    user_data_raw: {
+      email: userData.email,
+      phone: userData.phone,
+      firstName: userData.firstName,
+      lastName: userData.lastName,
+      city: cachedGeoData?.city || userData.city || '',
+      state: cachedGeoData?.state || userData.state || '',
+      zip: cachedGeoData?.zip || userData.zip || '',
+      country: cachedGeoData?.country || userData.country || 'BR'
+    }
   });
   
   if (META_CONFIG.TRACKING.enableDebugLogs) {
