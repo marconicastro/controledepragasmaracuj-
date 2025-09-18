@@ -102,7 +102,18 @@ export function getGoogleClientId(): string | null {
 }
 
 /**
- * Obtém dados de localização usando múltiplas APIs com fallback
+ * Cache para dados geográficos para evitar múltiplas chamadas de API
+ */
+let geographicCache: {
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+  timestamp: number;
+} | null = null;
+
+/**
+ * Obtém dados de localização usando cache ou múltiplas APIs com fallback
  * @returns Promise com dados de localização
  */
 export async function getLocationData(): Promise<{
@@ -111,6 +122,19 @@ export async function getLocationData(): Promise<{
   zip: string;
   country: string;
 }> {
+  // Verificar se temos dados em cache (válidos por 30 minutos)
+  if (geographicCache && (Date.now() - geographicCache.timestamp) < 30 * 60 * 1000) {
+    console.log('✅ Usando dados geográficos em cache:', geographicCache);
+    return {
+      city: geographicCache.city,
+      state: geographicCache.state,
+      zip: geographicCache.zip,
+      country: geographicCache.country
+    };
+  }
+
+  console.log('🌍 Buscando novos dados geográficos...');
+  
   // Tentar múltiplas APIs em sequência
   const apis = [
     // API 1: ipapi.co (mais precisa)
@@ -200,18 +224,59 @@ export async function getLocationData(): Promise<{
     const result = await api();
     if (result && (result.city || result.state || result.zip)) {
       console.log('✅ Dados de localização obtidos com sucesso:', result);
+      
+      // Armazenar em cache
+      geographicCache = {
+        city: result.city,
+        state: result.state,
+        zip: result.zip,
+        country: result.country,
+        timestamp: Date.now()
+      };
+      
       return result;
     }
   }
 
   // Fallback final com dados padrão do Brasil
   console.warn('⚠️ Usando fallback de localização padrão (Brasil)');
-  return {
+  const fallbackData = {
     city: 'São Paulo',      // Cidade mais populosa como fallback
     state: 'SP',            // Estado mais populoso como fallback
     zip: '01310-100',       // CEP central de São Paulo
     country: 'BR'           // Garantir Brasil
   };
+  
+  // Armazenar fallback em cache também
+  geographicCache = {
+    city: fallbackData.city,
+    state: fallbackData.state,
+    zip: fallbackData.zip,
+    country: fallbackData.country,
+    timestamp: Date.now()
+  };
+  
+  return fallbackData;
+}
+
+/**
+ * Obtém dados geográficos em cache (para uso imediato)
+ */
+export function getCachedGeographicData(): {
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+} | null {
+  if (geographicCache && (Date.now() - geographicCache.timestamp) < 30 * 60 * 1000) {
+    return {
+      city: geographicCache.city,
+      state: geographicCache.state,
+      zip: geographicCache.zip,
+      country: geographicCache.country
+    };
+  }
+  return null;
 }
 
 /**

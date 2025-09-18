@@ -19,9 +19,6 @@ export default function GoogleTagManager({ gtmId = 'GTM-567XZCDX' }: GoogleTagMa
   const pathname = usePathname();
 
   useEffect(() => {
-    // Inicializar captura de parâmetros de rastreamento primeiro
-    initializeTracking();
-    
     // Inicializar dataLayer se não existir
     if (typeof window !== 'undefined') {
       window.dataLayer = window.dataLayer || [];
@@ -35,7 +32,7 @@ export default function GoogleTagManager({ gtmId = 'GTM-567XZCDX' }: GoogleTagMa
       window.gtag('js', new Date());
       window.gtag('config', gtmId);
 
-      // Enviar evento page_view com dados completos de rastreamento quando a rota mudar
+      // Enviar evento page_view IMEDIATAMENTE (sem esperar FBC)
       const sendPageView = async () => {
         const trackingParams = await getAllTrackingParams();
         
@@ -51,10 +48,17 @@ export default function GoogleTagManager({ gtmId = 'GTM-567XZCDX' }: GoogleTagMa
           user_data: trackingParams
         });
         
-        console.log('📍 PageView enviado com event_id:', eventId, 'e dados completos:', trackingParams);
+        console.log('📍 PageView enviado RAPIDAMENTE com event_id:', eventId, 'e dados:', trackingParams);
       };
 
+      // Enviar PageView imediatamente (prioridade #1)
       sendPageView();
+      
+      // Capturar FBC em segundo plano (não bloquear PageView)
+      setTimeout(() => {
+        console.log('🎯 Capturando FBC em segundo plano (não bloqueia PageView)...');
+        initializeTracking();
+      }, 100);
     }
   }, [pathname, gtmId]);
 

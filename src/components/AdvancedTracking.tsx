@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import META_CONFIG, { formatUserDataForMeta, validateMetaConfig } from '@/lib/metaConfig';
-import { getAllTrackingParams, initializeTracking } from '@/lib/cookies';
+import { getAllTrackingParams, initializeTracking, getCachedGeographicData } from '@/lib/cookies';
 
 // --- FUNÇÕES HELPER PARA O DATALAYER ---
 // Função para gerar event_id único para desduplicação
@@ -24,8 +24,17 @@ const trackViewContent = async (viewContentHasBeenTracked) => {
   // Gerar event_id único para desduplicação
   const eventId = generateEventId();
   
+  // Tentar obter dados geográficos em cache primeiro (rápido)
+  const cachedGeoData = getCachedGeographicData();
+  
   // Obter todos os parâmetros de rastreamento (incluindo localização e cookies)
   const trackingParams = await getAllTrackingParams();
+  
+  // Se temos dados geográficos em cache, usar eles (mais confiáveis)
+  if (cachedGeoData) {
+    Object.assign(trackingParams, cachedGeoData);
+    console.log('🌍 Usando dados geográficos em cache para ViewContent:', cachedGeoData);
+  }
   
   // Enviar APENAS via DataLayer (GTM) - Remover envio direto do Facebook Pixel
   window.dataLayer = window.dataLayer || [];
@@ -49,6 +58,7 @@ const trackViewContent = async (viewContentHasBeenTracked) => {
     console.log('DataLayer Push: view_content (disparado uma única vez via GTM)');
     console.log('🔑 Event ID:', eventId);
     console.log('📍 Dados de rastreamento (formato GTM):', trackingParams);
+    console.log('🌍 Dados geográficos usados:', cachedGeoData || 'Buscados em tempo real');
     console.log('✅ Evento enviado apenas via DataLayer - GTM gerencia Facebook Pixel');
   }
   
@@ -63,6 +73,9 @@ const trackCheckout = async (userData) => {
   // Gerar event_id único e consistente com o mesmo padrão dos outros eventos
   const eventId = Date.now().toString(36) + Math.random().toString(36).substr(2);
   
+  // Tentar obter dados geográficos em cache primeiro (rápido e confiável)
+  const cachedGeoData = getCachedGeographicData();
+  
   // Preparar dados no FORMATO META que o Facebook reconhece
   const metaFormattedData = {
     // ✅ Dados do usuário no formato que o Facebook entende
@@ -70,10 +83,12 @@ const trackCheckout = async (userData) => {
     ph: userData.phone,          // Telefone - Facebook entende "ph"
     fn: userData.firstName,      // Primeiro nome - Facebook entende "fn"
     ln: userData.lastName,       // Sobrenome - Facebook entende "ln"
-    ct: userData.city,           // Cidade - Facebook entende "ct"
-    st: userData.state,          // Estado - Facebook entende "st"
-    zp: userData.zip,            // CEP - Facebook entende "zp"
-    country: 'BR',               // País - Facebook entende "country"
+    
+    // ✅ Dados geográficos - usar cache se disponível, senão usar do formulário
+    ct: cachedGeoData?.city || userData.city || '',           // Cidade - Facebook entende "ct"
+    st: cachedGeoData?.state || userData.state || '',          // Estado - Facebook entende "st"
+    zp: cachedGeoData?.zip || userData.zip || '',            // CEP - Facebook entende "zp"
+    country: cachedGeoData?.country || 'BR',                 // País - Facebook entende "country"
     
     // ✅ Dados de rastreamento para matching
     fbc: userData.fbc,
@@ -104,6 +119,7 @@ const trackCheckout = async (userData) => {
     console.log('🛒 DataLayer Push: initiate_checkout (via GTM - formato META)');
     console.log('🔑 Event ID:', eventId);
     console.log('📊 Dados formatados (META padrão):', metaFormattedData);
+    console.log('🌍 Dados geográficos usados:', cachedGeoData || 'Dados do formulário');
     console.log('✅ Agora Facebook reconhece em, ph, fn, ln!');
     console.log('📈 Expectativa: Score deve subir para 7.0+ com dados do formulário');
   }
@@ -119,6 +135,9 @@ const trackCheckout = async (userData) => {
     console.log('   - Telefone (ph):', userData.phone);
     console.log('   - Nome (fn):', userData.firstName);
     console.log('   - Sobrenome (ln):', userData.lastName);
+    if (cachedGeoData) {
+      console.log('🌍 Dados geográficos em cache utilizados:', cachedGeoData);
+    }
   }
 };
 
@@ -137,11 +156,12 @@ export default function AdvancedTracking() {
     
     // Log de inicialização unificada
     if (META_CONFIG.TRACKING.enableDebugLogs) {
-      console.log('🎯 AdvancedTracking: Inicializado com arquitetura unificada GTM');
+      console.log('🎯 AdvancedTracking: Inicializado com arquitetura otimizada');
       console.log('📊 Todos os eventos (PageView, ViewContent, InitiateCheckout) usam apenas GTM');
       console.log('🔗 Event ID padrão sincronizado entre todos os eventos');
-      console.log('📈 Expectativa: Scores de qualidade consistentes (~6.7+) para todos os eventos');
-      console.log('🎯 FBC: Agora capturando fbclid da URL e criando cookie _fbc automaticamente');
+      console.log('🌍 Dados geográficos com cache para melhor performance');
+      console.log('🎯 FBC: Capturando fbclid da URL e criando cookie _fbc automaticamente');
+      console.log('📈 Expectativa: Scores de qualidade excelentes (7.0+) para todos os eventos');
     }
     
     // Dispara o view_content após o tempo configurado, mas apenas se a trava permitir.
