@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { getAllTrackingParams, initializeTracking } from '@/lib/cookies';
+import { getAllTrackingParams, initializeTracking, retryFbcCapture, waitForGeographicData } from '@/lib/cookies';
 
 declare global {
   interface Window {
@@ -32,8 +32,8 @@ export default function GoogleTagManager({ gtmId = 'GTM-567XZCDX' }: GoogleTagMa
       window.gtag('js', new Date());
       window.gtag('config', gtmId);
 
-      // Enviar evento page_view IMEDIATAMENTE (sem esperar FBC)
-      const sendPageView = async () => {
+      // Estratégia de envio de PageView otimizada para FBC e dados geográficos
+      const sendPageView = async (retryCount = 0) => {
         const trackingParams = await getAllTrackingParams();
         
         // Gerar event_id consistente para correlação
@@ -48,17 +48,35 @@ export default function GoogleTagManager({ gtmId = 'GTM-567XZCDX' }: GoogleTagMa
           user_data: trackingParams
         });
         
-        console.log('📍 PageView enviado RAPIDAMENTE com event_id:', eventId, 'e dados:', trackingParams);
+        console.log(`📍 PageView enviado (tentativa ${retryCount + 1}) com event_id:`, eventId, 'e dados:', trackingParams);
+        
+        // Se temos FBC e dados geográficos, ótimo! Se não, tentar novamente em breve
+        const hasGoodData = trackingParams.fbc && trackingParams.city && trackingParams.state;
+        if (!hasGoodData && retryCount < 3) {
+          setTimeout(async () => {
+            console.log(`🔄 Tentando capturar mais dados (tentativa ${retryCount + 2})...`);
+            await sendPageView(retryCount + 1);
+          }, retryCount === 0 ? 1000 : 1500); // Primeira tentativa em 1s, depois 1.5s
+        }
       };
 
-      // Enviar PageView imediatamente (prioridade #1)
-      sendPageView();
+      // Iniciar captura de FBC imediatamente com retry
+      console.log('🎯 Iniciando captura de FBC com retry...');
+      initializeTracking();
+      retryFbcCapture(3, 500); // 3 tentativas com delay crescente
       
-      // Capturar FBC em segundo plano (não bloquear PageView)
-      setTimeout(() => {
-        console.log('🎯 Capturando FBC em segundo plano (não bloqueia PageView)...');
-        initializeTracking();
-      }, 100);
+      // Aguardar um pouco para tentar capturar dados geográficos e FBC
+      setTimeout(async () => {
+        console.log('🌍 Aguardando dados geográficos...');
+        const geoData = await waitForGeographicData(1500); // Esperar até 1.5s por dados geográficos
+        if (geoData) {
+          console.log('✅ Dados geográficos obtidos:', geoData);
+        } else {
+          console.log('⚠️ Dados geográficos não obtidos no timeout, enviando mesmo assim...');
+        }
+        
+        sendPageView();
+      }, 500); // Esperar 500ms antes de enviar
     }
   }, [pathname, gtmId]);
 

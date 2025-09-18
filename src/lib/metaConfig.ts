@@ -99,7 +99,7 @@ export const META_CONFIG = {
 
 // Função para validar configuração
 export const validateMetaConfig = () => {
-  const errors = [];
+  const errors: string[] = [];
   
   if (META_CONFIG.PIXEL_ID === 'SEU_PIXEL_ID_AQUI') {
     errors.push('⚠️ PIXEL_ID não configurado. Substitua "SEU_PIXEL_ID_AQUI" pelo seu ID real do Facebook Pixel.');

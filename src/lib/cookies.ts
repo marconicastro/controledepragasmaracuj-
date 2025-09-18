@@ -42,9 +42,23 @@ export function captureFbclid(): void {
     return;
   }
   
-  // Capturar fbclid da URL
+  // Tentar múltiplas fontes de fbclid
+  let fbclid: string | null = null;
+  
+  // 1. Verificar URL parameters
   const urlParams = new URLSearchParams(window.location.search);
-  const fbclid = urlParams.get('fbclid');
+  fbclid = urlParams.get('fbclid');
+  
+  // 2. Verificar sessionStorage (pode ter sido salvo anteriormente)
+  if (!fbclid && typeof sessionStorage !== 'undefined') {
+    fbclid = sessionStorage.getItem('fbclid');
+  }
+  
+  // 3. Verificar se há algum fbclid em hash fragments
+  if (!fbclid && window.location.hash) {
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    fbclid = hashParams.get('fbclid');
+  }
   
   if (fbclid) {
     // Criar o cookie _fbc no formato correto
@@ -58,11 +72,49 @@ export function captureFbclid(): void {
     
     document.cookie = `_fbc=${fbcValue}; expires=${expirationDate.toUTCString()}; path=/; domain=${window.location.hostname}; SameSite=Lax`;
     
+    // Salvar no sessionStorage para referência futura
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem('fbclid', fbclid);
+    }
+    
     console.log('🎯 Cookie _fbc criado com sucesso:', fbcValue);
     console.log('📊 fbclid capturado:', fbclid);
   } else {
-    console.log('ℹ️ Nenhum fbclid encontrado na URL - usuário pode ter acessado diretamente');
+    console.log('ℹ️ Nenhum fbclid encontrado na URL, sessionStorage ou hash - usuário pode ter acessado diretamente');
   }
+}
+
+/**
+ * Função que aguarda a captura de dados geográficos com timeout
+ * @param timeout Tempo máximo de espera em ms
+ * @returns Promise com dados geográficos ou null
+ */
+export async function waitForGeographicData(timeout = 2000): Promise<{
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+} | null> {
+  return new Promise((resolve) => {
+    const startTime = Date.now();
+    
+    const checkCache = () => {
+      const cachedData = getCachedGeographicData();
+      if (cachedData) {
+        resolve(cachedData);
+        return;
+      }
+      
+      if (Date.now() - startTime > timeout) {
+        resolve(null);
+        return;
+      }
+      
+      setTimeout(checkCache, 100); // Verificar a cada 100ms
+    };
+    
+    checkCache();
+  });
 }
 
 /**
@@ -82,6 +134,38 @@ export function initializeTracking(): void {
   console.log('📊 Status dos cookies de rastreamento:');
   console.log('   - _fbc:', fbc || 'Não encontrado');
   console.log('   - _fbp:', fbp || 'Não encontrado');
+}
+
+/**
+ * Função de retry para captura de FBC com múltiplas tentativas
+ * @param maxAttempts Número máximo de tentativas
+ * @param delay Atraso inicial entre tentativas (ms)
+ */
+export function retryFbcCapture(maxAttempts = 5, delay = 1000): void {
+  if (typeof window === 'undefined') return;
+  
+  let attempts = 0;
+  
+  const tryCapture = () => {
+    attempts++;
+    console.log(`🔄 Tentativa ${attempts}/${maxAttempts} de capturar FBC...`);
+    
+    captureFbclid();
+    const { fbc } = getFacebookCookies();
+    
+    if (fbc) {
+      console.log('✅ FBC capturado com sucesso na tentativa', attempts);
+      return;
+    }
+    
+    if (attempts < maxAttempts) {
+      setTimeout(tryCapture, delay * attempts); // Aumentar delay a cada tentativa
+    } else {
+      console.log('❌ Não foi possível capturar FBC após', maxAttempts, 'tentativas');
+    }
+  };
+  
+  tryCapture();
 }
 
 /**
@@ -140,12 +224,17 @@ export async function getLocationData(): Promise<{
     // API 1: ipapi.co (mais precisa)
     async () => {
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        
         const response = await fetch('https://ipapi.co/json/', {
           method: 'GET',
           mode: 'cors',
           cache: 'no-cache',
-          timeout: 5000
+          signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
         
         if (response.ok) {
           const data = await response.json();
@@ -165,12 +254,17 @@ export async function getLocationData(): Promise<{
     // API 2: ip-api.com (fallback)
     async () => {
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        
         const response = await fetch('http://ip-api.com/json/', {
           method: 'GET',
           mode: 'cors',
           cache: 'no-cache',
-          timeout: 5000
+          signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
         
         if (response.ok) {
           const data = await response.json();
