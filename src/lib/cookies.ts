@@ -102,6 +102,78 @@ export function getGoogleClientId(): string | null {
 }
 
 /**
+ * Obtém dados de localização de ALTA QUALIDADE com prioridade para dados do formulário
+ * @returns Promise com dados de localização da melhor fonte disponível
+ */
+export async function getHighQualityLocationData(): Promise<{
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+}> {
+  // 1. Tentar obter dados do formulário primeiro (mais precisos)
+  const formLocation = getFormLocationData();
+  if (formLocation && formLocation.city && formLocation.state && formLocation.zip) {
+    console.log('🌍 Usando dados de localização do formulário (ALTA QUALIDADE):', formLocation);
+    return formLocation;
+  }
+  
+  // 2. Tentar obter dados em cache (rápido e confiável)
+  const cachedGeoData = getCachedGeographicData();
+  if (cachedGeoData) {
+    console.log('🌍 Usando dados geográficos em cache:', cachedGeoData);
+    return {
+      city: cachedGeoData.city,
+      state: cachedGeoData.state,
+      zip: cachedGeoData.zip,
+      country: cachedGeoData.country
+    };
+  }
+  
+  // 3. Fallback para API externa
+  console.log('🌍 Buscando dados de localização via API externa...');
+  return await getLocationData();
+}
+
+/**
+ * Obtém dados de localização do formulário (se disponíveis)
+ * Verifica se os campos do formulário estão preenchidos na página
+ */
+function getFormLocationData(): {
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+} | null {
+  if (typeof document === 'undefined') return null;
+  
+  try {
+    // Verificar se há elementos do formulário na página
+    const cityElement = document.querySelector('input[name="city"]') as HTMLInputElement;
+    const stateElement = document.querySelector('input[name="state"]') as HTMLInputElement;
+    const zipElement = document.querySelector('input[name="cep"]') as HTMLInputElement;
+    
+    const city = cityElement?.value?.trim();
+    const state = stateElement?.value?.trim();
+    const zip = zipElement?.value?.replace(/\D/g, '');
+    
+    // Retornar apenas se todos os campos estiverem preenchidos
+    if (city && state && zip && zip.length === 8) {
+      return {
+        city: city,
+        state: state.toUpperCase(),
+        zip: zip,
+        country: 'BR'
+      };
+    }
+  } catch (error) {
+    console.warn('⚠️ Erro ao obter dados do formulário:', error);
+  }
+  
+  return null;
+}
+
+/**
  * Cache para dados geográficos para evitar múltiplas chamadas de API
  */
 let geographicCache: {
@@ -277,6 +349,100 @@ export function getCachedGeographicData(): {
     };
   }
   return null;
+}
+
+/**
+ * Função para validar qualidade dos dados com feedback detalhado
+ * @param data Dados a serem validados
+ * @returns Objeto com score, problemas e recomendações
+ */
+export function validateDataQuality(data: any): {
+  score: number;
+  issues: string[];
+  recommendations: string[];
+  isValid: boolean;
+} {
+  const issues: string[] = [];
+  const recommendations: string[] = [];
+  let score = 0;
+  
+  // Validar FBC (mais importante - 30 pontos)
+  if (!data.fbc) {
+    issues.push('FBC não encontrado');
+    recommendations.push('Verifique se o fbclid está na URL ou se o cookie _fbc existe');
+  } else {
+    score += 30;
+  }
+  
+  // Validar FBP (importante - 20 pontos)
+  if (!data.fbp) {
+    issues.push('FBP não encontrado');
+    recommendations.push('Verifique se o cookie _fbp existe');
+  } else {
+    score += 20;
+  }
+  
+  // Validar dados de localização (10 pontos cada)
+  if (!data.ct || data.ct.length < 2) {
+    issues.push('Cidade inválida ou ausente');
+    recommendations.push('Use API de geolocalização ou dados do formulário');
+  } else {
+    score += 10;
+  }
+  
+  if (!data.st || data.st.length < 2) {
+    issues.push('Estado inválido ou ausente');
+    recommendations.push('Verifique o formato do estado (2 letras)');
+  } else {
+    score += 10;
+  }
+  
+  if (!data.zp || data.zp.length < 8) {
+    issues.push('CEP inválido ou ausente');
+    recommendations.push('Use CEP válido com 8 dígitos');
+  } else {
+    score += 10;
+  }
+  
+  // Validar external_id (10 pontos)
+  if (!data.external_id) {
+    issues.push('External ID não encontrado');
+    recommendations.push('Gere external_id a partir do email ou outro identificador único');
+  } else {
+    score += 10;
+  }
+  
+  // Validar GA Client ID (bônus - 10 pontos)
+  if (!data.ga_client_id) {
+    issues.push('GA Client ID não encontrado');
+    recommendations.push('Verifique se o Google Analytics está configurado corretamente');
+  } else {
+    score += 10;
+  }
+  
+  // Validar dados do usuário (se disponíveis)
+  if (data.em && data.em.includes('@')) {
+    score += 5; // Bônus para email
+  }
+  if (data.ph && data.ph.length >= 10) {
+    score += 5; // Bônus para telefone
+  }
+  if (data.fn && data.fn.length > 1) {
+    score += 3; // Bônus para nome
+  }
+  if (data.ln && data.ln.length > 1) {
+    score += 2; // Bônus para sobrenome
+  }
+  
+  const maxScore = 130; // Score máximo possível com todos os bônus
+  const isValid = score >= 70; // Considerar válido se score >= 70%
+  
+  return {
+    score: Math.round((score / maxScore) * 100),
+    issues,
+    recommendations,
+    isValid
+  };
 }
 
 /**

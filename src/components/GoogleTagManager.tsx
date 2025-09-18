@@ -32,13 +32,18 @@ export default function GoogleTagManager({ gtmId = 'GTM-567XZCDX' }: GoogleTagMa
       window.gtag('js', new Date());
       window.gtag('config', gtmId);
 
-      // Enviar evento page_view IMEDIATAMENTE (sem esperar FBC)
+      // Enviar evento page_view APÓS capturar FBC (sincronizado)
       const sendPageView = async () => {
+        // 1. Capturar FBC PRIMEIRO (crítico para qualidade)
+        await initializeTracking();
+        
+        // 2. Obter todos os parâmetros de rastreamento com FBC garantido
         const trackingParams = await getAllTrackingParams();
         
-        // Gerar event_id consistente para correlação
+        // 3. Gerar event_id consistente para correlação
         const eventId = Date.now().toString(36) + Math.random().toString(36).substr(2);
         
+        // 4. Enviar PageView com FBC garantido
         window.gtag('event', 'page_view', {
           page_title: document.title,
           page_location: window.location.href,
@@ -48,17 +53,12 @@ export default function GoogleTagManager({ gtmId = 'GTM-567XZCDX' }: GoogleTagMa
           user_data: trackingParams
         });
         
-        console.log('📍 PageView enviado RAPIDAMENTE com event_id:', eventId, 'e dados:', trackingParams);
+        console.log('📍 PageView enviado COM FBC:', trackingParams.fbc);
+        console.log('📊 Dados completos:', trackingParams);
       };
 
-      // Enviar PageView imediatamente (prioridade #1)
+      // Enviar PageView de forma sincronizada (aguarda FBC)
       sendPageView();
-      
-      // Capturar FBC em segundo plano (não bloquear PageView)
-      setTimeout(() => {
-        console.log('🎯 Capturando FBC em segundo plano (não bloqueia PageView)...');
-        initializeTracking();
-      }, 100);
     }
   }, [pathname, gtmId]);
 
