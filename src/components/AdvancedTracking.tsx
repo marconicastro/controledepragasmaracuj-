@@ -222,6 +222,12 @@ const trackViewContent = async (viewContentHasBeenTracked) => {
  * @param {object} userData - Os dados capturados do formulário de pré-checkout.
  */
 const trackCheckout = async (userData) => {
+  console.log('🚀 trackCheckout chamado com userData:', userData);
+  console.log('📧 userData.email:', userData.email);
+  console.log('📞 userData.phone:', userData.phone);
+  console.log('👤 userData.firstName:', userData.firstName);
+  console.log('👥 userData.lastName:', userData.lastName);
+  
   // Gerar event_id único e consistente com o mesmo padrão dos outros eventos
   const eventId = Date.now().toString(36) + Math.random().toString(36).substr(2);
   
@@ -273,6 +279,11 @@ const trackCheckout = async (userData) => {
   if (typeof window !== 'undefined') {
     try {
       console.log('🚀 Tentando enviar dados para o server-side...');
+      console.log('📊 metaFormattedData completo:', metaFormattedData);
+      console.log('📧 Email (em):', metaFormattedData.em);
+      console.log('📞 Telefone (ph):', metaFormattedData.ph);
+      console.log('👤 Nome (fn):', metaFormattedData.fn);
+      console.log('👥 Sobrenome (ln):', metaFormattedData.ln);
       
       // Preparar dados no formato EXATO que o Facebook Pixel espera no server-side
       const serverSideData = {
@@ -281,19 +292,19 @@ const trackCheckout = async (userData) => {
         pixel_id: '714277868320104', // ID do Pixel do Facebook
         user_data: {
           // Dados do usuário no formato que o Facebook Pixel reconhece
-          em: metaFormattedData.em,
-          ph: metaFormattedData.ph,
-          fn: metaFormattedData.fn,
-          ln: metaFormattedData.ln,
-          ct: metaFormattedData.ct,
-          st: metaFormattedData.st,
-          zp: metaFormattedData.zp,
-          country: metaFormattedData.country,
+          em: metaFormattedData.em || '',
+          ph: metaFormattedData.ph || '',
+          fn: metaFormattedData.fn || '',
+          ln: metaFormattedData.ln || '',
+          ct: metaFormattedData.ct || '',
+          st: metaFormattedData.st || '',
+          zp: metaFormattedData.zp || '',
+          country: metaFormattedData.country || 'BR',
           client_ip_address: '', // Será preenchido pelo server-side
           client_user_agent: navigator.userAgent,
-          fbc: metaFormattedData.fbc,
-          fbp: metaFormattedData.fbp,
-          external_id: metaFormattedData.external_id
+          fbc: metaFormattedData.fbc || '',
+          fbp: metaFormattedData.fbp || '',
+          external_id: metaFormattedData.external_id || ''
         },
         custom_data: {
           currency: 'BRL',
