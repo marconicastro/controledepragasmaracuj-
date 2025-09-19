@@ -186,20 +186,24 @@ export default function App() {
         console.log('⚠️ AdvancedTracking não disponível, redirecionando mesmo assim');
       }
 
-      // Fechar modal e redirecionar imediatamente
+      // Fechar modal e aguardar um pouco antes de redirecionar (para GTM Server processar)
       setIsPreCheckoutModalOpen(false);
       
-      // Garantir redirecionamento com múltiplos métodos
+      console.log('⏳ Aguardando 2 segundos para GTM Server processar antes de redirecionar...');
+      
+      // Aumentar o tempo para dar mais chance ao GTM Server
       setTimeout(() => {
+        console.log('🚀 Redirecionando para o checkout...');
         window.location.href = finalUrlString;
-      }, 100);
+      }, 2000); // Aumentado de 100ms para 2000ms
       
       // Fallback adicional
       setTimeout(() => {
         if (window.location.href !== finalUrlString) {
+          console.log('🔄 Fallback: Redirecionando novamente...');
           window.location.replace(finalUrlString);
         }
-      }, 1000);
+      }, 4000); // Aumentado proporcionalmente
     } catch (error) {
       console.error('❌ Erro no handlePreCheckoutSubmit:', error);
       alert('Erro ao processar seu pedido. Tente novamente.');
