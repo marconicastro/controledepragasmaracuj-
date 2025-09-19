@@ -89,6 +89,10 @@ const sendEventWithRetry = async (eventName: string, eventData: any, maxRetries 
       }
       
       // Enviar evento com dados de qualidade aceitável
+      console.log(`🚀 ENVIANDO EVENTO ${eventName} PARA DATALAYER (via sendEventWithRetry):`);
+      console.log('Payload completo:', eventData);
+      console.log('user_data:', eventData.user_data);
+      
       window.dataLayer.push(eventData);
       
       console.log(`✅ Evento ${eventName} enviado com sucesso!`);
@@ -333,7 +337,7 @@ const trackCheckout = async (userData) => {
       });
       
       // Também enviar via dataLayer para garantir que o GTM capture
-      window.dataLayer.push({
+      const dataLayerPayload = {
         event: 'initiate_checkout',
         event_id: eventId,
         user_data: metaFormattedData,
@@ -350,7 +354,14 @@ const trackCheckout = async (userData) => {
             country: metaFormattedData.country
           }
         }
-      });
+      };
+      
+      console.log('🚀 ENVIANDO PARA DATALAYER:');
+      console.log('Payload completo:', dataLayerPayload);
+      console.log('user_data:', dataLayerPayload.user_data);
+      console.log('facebook_pixel_data:', dataLayerPayload.facebook_pixel_data);
+      
+      window.dataLayer.push(dataLayerPayload);
       
     } catch (error) {
       console.error('❌ Erro ao enviar dados para o server-side:', error);

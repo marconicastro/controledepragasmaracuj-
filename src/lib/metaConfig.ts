@@ -3,7 +3,7 @@
 const META_CONFIG = {
   // Meta Pixel Configuration
   pixel: {
-    id: '123456789012345', // Replace with your actual Meta Pixel ID
+    id: '714277868320104', // ✅ ID REAL DO FACEBOOK
     events: {
       PageView: 'PageView',
       ViewContent: 'ViewContent',
@@ -16,7 +16,7 @@ const META_CONFIG = {
 
   // Google Tag Manager Configuration
   gtm: {
-    id: 'GTM-XXXXXXX', // Replace with your actual GTM ID
+    id: 'GTM-567XZCDX', // ✅ ID REAL DO GTM
     events: {
       pageView: 'page_view',
       lead: 'generate_lead',
