@@ -42,27 +42,31 @@ export default function App() {
 
   // Função para processar os dados do pré-checkout e redirecionar
   const handlePreCheckoutSubmit = async (formData) => {
+    console.log('🚀 handlePreCheckoutSubmit - Função chamada!');
     console.log('🚀 Dados recebidos do formulário:', formData);
     
-    // Garantir que o nome completo esteja limpo e formatado corretamente
-    const cleanFullName = formData.fullName
-      .trim()
-      .replace(/\s+/g, ' ') // Remove espaços extras
-      .replace(/[^a-zA-ZÀ-ÿ\s'-]/g, '') // Remove caracteres inválidos
-      .replace(/^-+|-+$/g, '') // Remove hífens do início/fim
-      .replace(/^'+|'+$/g, ''); // Remove apóstrofos do início/fim
-    
-    console.log('Nome limpo:', cleanFullName);
-    console.log('Email:', formData.email);
-    console.log('Telefone:', formData.phone);
+    try {
+      // Garantir que o nome completo esteja limpo e formatado corretamente
+      const cleanFullName = formData.fullName
+        .trim()
+        .replace(/\s+/g, ' ') // Remove espaços extras
+        .replace(/[^a-zA-ZÀ-ÿ\s'-]/g, '') // Remove caracteres inválidos
+        .replace(/^-+|-+$/g, '') // Remove hífens do início/fim
+        .replace(/^'+|'+$/g, ''); // Remove apóstrofos do início/fim
+      
+      console.log('Nome limpo:', cleanFullName);
+      console.log('Email:', formData.email);
+      console.log('Telefone:', formData.phone);
 
-    // Capturar cookies necessários usando os utilitários
-    const { fbc, fbp } = getFacebookCookies();
-    const clientId = getGoogleClientId();
+      // Capturar cookies necessários usando os utilitários
+      const { fbc, fbp } = getFacebookCookies();
+      const clientId = getGoogleClientId();
 
-    // Construir URL limpa e definitiva com URLSearchParams
-    const baseUrl = META_CONFIG.HOTMART.checkoutUrl;
-    const finalUrl = new URL(baseUrl);
+      // Construir URL limpa e definitiva com URLSearchParams
+      const baseUrl = META_CONFIG.hotmart.checkoutUrl;
+      console.log('🔗 URL base:', baseUrl);
+      const finalUrl = new URL(baseUrl);
+      console.log('🔗 URL objeto criado:', finalUrl.toString());
     
     // 1. Parâmetros de Rastreamento (Manter)
     if (clientId) {
@@ -89,7 +93,7 @@ export default function App() {
     console.log('📧 Adicionando parâmetro email:', formData.email);
     finalUrl.searchParams.set('email', formData.email);
     
-    // Para o Telefone: APENAS os parâmetros 'phone_local_code' e 'phone_number'
+    // Para o Telefone: TENTAR DIFERENTES PARÂMETROS COMUNS
     const phoneClean = formData.phone.replace(/\D/g, '');
     console.log('Telefone limpo:', phoneClean);
     
@@ -101,8 +105,18 @@ export default function App() {
       console.log('DDD:', ddd);
       console.log('Número:', numero);
       
+      // Tentar diferentes combinações de parâmetros que o Hotmart possa aceitar
+      finalUrl.searchParams.set('phone', phoneClean); // Telefone completo
+      finalUrl.searchParams.set('telephone', phoneClean); // Alternativa em inglês
+      finalUrl.searchParams.set('celular', phoneClean); // Alternativa em português
+      finalUrl.searchParams.set('ddd', ddd); // Apenas o DDD
+      finalUrl.searchParams.set('telefone', phoneClean); // Telefone completo em português
+      
+      // Manter os parâmetros originais como fallback
       finalUrl.searchParams.set('phone_local_code', ddd);
       finalUrl.searchParams.set('phone_number', numero);
+      
+      console.log('Todos os parâmetros de telefone enviados!');
     }
 
     // 3. Parâmetros adicionais
@@ -128,6 +142,11 @@ export default function App() {
     console.log('Parâmetros:');
     console.log('name:', finalUrl.searchParams.get('name'));
     console.log('email:', finalUrl.searchParams.get('email'));
+    console.log('phone:', finalUrl.searchParams.get('phone'));
+    console.log('telephone:', finalUrl.searchParams.get('telephone'));
+    console.log('celular:', finalUrl.searchParams.get('celular'));
+    console.log('telefone:', finalUrl.searchParams.get('telefone'));
+    console.log('ddd:', finalUrl.searchParams.get('ddd'));
     console.log('phone_local_code:', finalUrl.searchParams.get('phone_local_code'));
     console.log('phone_number:', finalUrl.searchParams.get('phone_number'));
     console.log('city:', finalUrl.searchParams.get('city'));
@@ -157,14 +176,34 @@ export default function App() {
 
     console.log('📊 Dados do usuário enriquecidos para Meta:', enrichedUserData);
 
-    // Disparar evento de checkout com dados do usuário enriquecidos
-    if (typeof window !== 'undefined' && window.advancedTracking) {
-      await window.advancedTracking.trackCheckout(enrichedUserData);
-    }
+      // Disparar evento de checkout com dados do usuário enriquecidos (não bloqueia o redirecionamento)
+      if (typeof window !== 'undefined' && window.advancedTracking) {
+        // Executar o tracking em background sem esperar
+        window.advancedTracking.trackCheckout(enrichedUserData).catch(error => {
+          console.error('❌ Erro no tracking (não bloqueou o redirecionamento):', error);
+        });
+      } else {
+        console.log('⚠️ AdvancedTracking não disponível, redirecionando mesmo assim');
+      }
 
-    // Fechar modal e redirecionar
-    setIsPreCheckoutModalOpen(false);
-    window.location.href = finalUrlString;
+      // Fechar modal e redirecionar imediatamente
+      setIsPreCheckoutModalOpen(false);
+      
+      // Garantir redirecionamento com múltiplos métodos
+      setTimeout(() => {
+        window.location.href = finalUrlString;
+      }, 100);
+      
+      // Fallback adicional
+      setTimeout(() => {
+        if (window.location.href !== finalUrlString) {
+          window.location.replace(finalUrlString);
+        }
+      }, 1000);
+    } catch (error) {
+      console.error('❌ Erro no handlePreCheckoutSubmit:', error);
+      alert('Erro ao processar seu pedido. Tente novamente.');
+    }
   };
 
   const scrollToCheckout = () => {
@@ -731,7 +770,7 @@ export default function App() {
 
                 {/* CTA Final - Responsivo */}
                 <a 
-                  href="https://pay.hotmart.com/I101398692S" 
+                  href="https://checkout.maracujazeropragas.com/VCCL1O8SC7KX" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   id="botao-compra-hotmart" 

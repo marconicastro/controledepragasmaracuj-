@@ -1,5 +1,4 @@
 // server.ts - Next.js Standalone + Socket.IO
-import { setupSocket } from '@/lib/socket';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import next from 'next';
@@ -40,7 +39,28 @@ async function createCustomServer() {
       }
     });
 
-    setupSocket(io);
+    // Socket.io connection handler
+    io.on('connection', (socket) => {
+      console.log(`Client connected: ${socket.id}`);
+
+      // Join room based on user ID or session
+      socket.on('join-room', (roomId: string) => {
+        socket.join(roomId);
+        console.log(`Socket ${socket.id} joined room: ${roomId}`);
+      });
+
+      // Handle custom events
+      socket.on('user-action', (data) => {
+        console.log('User action:', data);
+        // Broadcast to all clients in the room
+        socket.to(data.roomId).emit('user-action', data);
+      });
+
+      // Handle disconnection
+      socket.on('disconnect', () => {
+        console.log(`Client disconnected: ${socket.id}`);
+      });
+    });
 
     // Start the server
     server.listen(currentPort, hostname, () => {

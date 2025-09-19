@@ -154,6 +154,8 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
       reset();
     } catch (error) {
       console.error('❌ Erro ao enviar formulário:', error);
+      // Adicionar feedback visual para o usuário
+      alert('Erro ao processar formulário. Tente novamente.');
     } finally {
       setIsSubmitting(false);
     }
