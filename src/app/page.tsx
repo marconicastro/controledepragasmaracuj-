@@ -176,34 +176,36 @@ export default function App() {
 
     console.log('📊 Dados do usuário enriquecidos para Meta:', enrichedUserData);
 
-      // Disparar evento de checkout com dados do usuário enriquecidos (não bloqueia o redirecionamento)
+      // Disparar evento de checkout com dados do usuário enriquecidos e esperar o envio
       if (typeof window !== 'undefined' && window.advancedTracking) {
-        // Executar o tracking em background sem esperar
-        window.advancedTracking.trackCheckout(enrichedUserData).catch(error => {
-          console.error('❌ Erro no tracking (não bloqueou o redirecionamento):', error);
-        });
+        console.log('🚀 Enviando dados para Facebook Pixel (aguardando conclusão)...');
+        try {
+          // Aguardar o envio completo dos dados antes de redirecionar
+          await window.advancedTracking.trackCheckout(enrichedUserData);
+          console.log('✅ Dados enviados com sucesso para Facebook Pixel!');
+        } catch (error) {
+          console.error('❌ Erro no tracking, mas continuando redirecionamento:', error);
+        }
       } else {
         console.log('⚠️ AdvancedTracking não disponível, redirecionando mesmo assim');
       }
 
-      // Fechar modal e aguardar um pouco antes de redirecionar (para GTM Server processar)
+      // Fechar modal e redirecionar APÓS enviar os dados
       setIsPreCheckoutModalOpen(false);
       
-      console.log('⏳ Aguardando 2 segundos para GTM Server processar antes de redirecionar...');
-      
-      // Aumentar o tempo para dar mais chance ao GTM Server
+      // Aumentar o tempo de espera para garantir que os dados sejam enviados
       setTimeout(() => {
-        console.log('🚀 Redirecionando para o checkout...');
+        console.log('🔄 Redirecionando para o Hotmart...');
         window.location.href = finalUrlString;
-      }, 2000); // Aumentado de 100ms para 2000ms
+      }, 1000); // Aumentado para 1 segundo
       
       // Fallback adicional
       setTimeout(() => {
         if (window.location.href !== finalUrlString) {
-          console.log('🔄 Fallback: Redirecionando novamente...');
+          console.log('🔄 Usando fallback de redirecionamento...');
           window.location.replace(finalUrlString);
         }
-      }, 4000); // Aumentado proporcionalmente
+      }, 2000);
     } catch (error) {
       console.error('❌ Erro no handlePreCheckoutSubmit:', error);
       alert('Erro ao processar seu pedido. Tente novamente.');

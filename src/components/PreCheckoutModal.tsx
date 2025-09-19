@@ -55,7 +55,14 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
     reset,
   } = useForm<CheckoutFormData>({
     resolver: zodResolver(checkoutFormSchema),
+    mode: 'onChange', // Adicionar validação em tempo real
   });
+
+  // Log para depuração quando o componente montar
+  React.useEffect(() => {
+    console.log('📝 PreCheckoutModal - Componente montado');
+    console.log('📝 PreCheckoutModal - Função register disponível:', typeof register);
+  }, []);
 
   // Função para formatar telefone - MELHORADA
   const formatPhone = (value: string) => {
@@ -82,7 +89,7 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
       const secondPart = limitedCleaned.substring(6);
       return `(${ddd}) ${firstPart}-${secondPart}`;
     } else {
-      // Formato celular: (11) 99999-8888
+      // Formato celular: (77) 99827-606 (formato brasileiro padrão)
       const ddd = limitedCleaned.substring(0, 2);
       const firstPart = limitedCleaned.substring(2, 7);
       const secondPart = limitedCleaned.substring(7);
@@ -146,7 +153,16 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
   };
 
   const onFormSubmit = async (data: CheckoutFormData) => {
-    console.log('📤 PreCheckoutModal - Dados enviados:', data);
+    console.log('📤 PreCheckoutModal - onFormSubmit chamado!');
+    console.log('📤 PreCheckoutModal - Dados recebidos do formulário:');
+    console.log('   fullName:', data.fullName);
+    console.log('   email:', data.email);
+    console.log('   phone:', data.phone);
+    console.log('   cep:', data.cep);
+    console.log('   city:', data.city);
+    console.log('   state:', data.state);
+    console.log('📤 PreCheckoutModal - Enviando dados para o pai...');
+    
     setIsSubmitting(true);
     try {
       await onSubmit(data);
@@ -159,6 +175,31 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Adicionar log para ver se o formulário está sendo submetido
+  const handleFormSubmit = (e: React.FormEvent) => {
+    console.log('📤 PreCheckoutModal - Formulário sendo submetido manualmente!');
+    console.log('📤 PreCheckoutModal - Evento:', e);
+    
+    // Verificar todos os campos do formulário antes de submeter
+    const form = e.target as HTMLFormElement;
+    const inputs = form.querySelectorAll('input');
+    console.log('🔍 PreCheckoutModal - Todos os inputs encontrados:', inputs.length);
+    
+    inputs.forEach((input, index) => {
+      console.log(`📝 PreCheckoutModal - Input ${index + 1}:`, {
+        id: input.id,
+        name: input.name,
+        type: input.type,
+        value: input.value,
+        hasId: !!input.id,
+        hasName: !!input.name,
+        autoComplete: input.getAttribute('autocomplete')
+      });
+    });
+    
+    handleSubmit(onFormSubmit)(e);
   };
 
   // Resetar formulário quando o modal fechar
@@ -181,7 +222,7 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
+        <form onSubmit={handleFormSubmit} className="space-y-4">
           {/* Campo Nome Completo */}
           <div className="space-y-2">
             <Label htmlFor="fullName" className="flex items-center gap-2 text-sm font-medium">
@@ -190,8 +231,10 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
             </Label>
             <Input
               id="fullName"
+              name="fullName"
               placeholder="Digite seu nome completo"
-              {...register('fullName')}
+              autoComplete="name"
+              {...register('fullName', { required: true })}
               className={errors.fullName ? 'border-red-500' : ''}
             />
             {errors.fullName && (
@@ -207,9 +250,11 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
             </Label>
             <Input
               id="email"
+              name="email"
               type="email"
               placeholder="seu@email.com"
-              {...register('email')}
+              autoComplete="email"
+              {...register('email', { required: true })}
               className={errors.email ? 'border-red-500' : ''}
             />
             {errors.email && (
@@ -225,8 +270,10 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
             </Label>
             <Input
               id="phone"
-              placeholder="(11) 99999-8888"
-              {...register('phone')}
+              name="phone"
+              placeholder="(77) 99827-606"
+              autoComplete="tel"
+              {...register('phone', { required: true })}
               onChange={handlePhoneChange}
               maxLength={15}
               className={errors.phone ? 'border-red-500' : ''}
@@ -244,7 +291,9 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
             </Label>
             <Input
               id="cep"
+              name="cep"
               placeholder="00000-000"
+              autoComplete="postal-code"
               {...register('cep')}
               onChange={handleCEPChange}
               onBlur={onCEPBlur}
@@ -265,7 +314,9 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
               </Label>
               <Input
                 id="city"
+                name="city"
                 placeholder="São Paulo"
+                autoComplete="address-level2"
                 {...register('city')}
                 className={errors.city ? 'border-red-500' : ''}
               />
@@ -281,7 +332,9 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
               </Label>
               <Input
                 id="state"
+                name="state"
                 placeholder="SP"
+                autoComplete="address-level1"
                 {...register('state')}
                 onChange={handleUFChange}
                 maxLength={2}

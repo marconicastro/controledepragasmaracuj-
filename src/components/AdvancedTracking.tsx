@@ -222,7 +222,8 @@ const trackViewContent = async (viewContentHasBeenTracked) => {
  * @param {object} userData - Os dados capturados do formulário de pré-checkout.
  */
 const trackCheckout = async (userData) => {
-  console.log('🚀 trackCheckout chamado com userData:', userData);
+  console.log('🚀 trackCheckout - INICIANDO envio de dados para Facebook Pixel');
+  console.log('🚀 trackCheckout - Dados recebidos:', userData);
   console.log('📧 userData.email:', userData.email);
   console.log('📞 userData.phone:', userData.phone);
   console.log('👤 userData.firstName:', userData.firstName);
@@ -230,9 +231,11 @@ const trackCheckout = async (userData) => {
   
   // Gerar event_id único e consistente com o mesmo padrão dos outros eventos
   const eventId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+  console.log('🆔 trackCheckout - Event ID gerado:', eventId);
   
   // Obter dados de localização de ALTA QUALIDADE (prioridade formulário > cache > API)
   const locationData = await getHighQualityLocationData();
+  console.log('📍 trackCheckout - Dados de localização:', locationData);
   
   // Preparar dados no FORMATO META que o Facebook reconhece - MELHORADO
   const metaFormattedData = {
@@ -255,6 +258,8 @@ const trackCheckout = async (userData) => {
     external_id: userData.external_id
   };
   
+  console.log('📊 trackCheckout - Dados formatados para Facebook:', metaFormattedData);
+  
   // ENVIAR VIA DATALAYER (GTM) com formato META para Facebook e sistema de retry
   const eventData = {
     event: 'initiate_checkout',
@@ -272,18 +277,21 @@ const trackCheckout = async (userData) => {
     user_data: metaFormattedData
   };
   
+  console.log('🚀 trackCheckout - Enviando via DataLayer...');
+  
   // Enviar com sistema de retry e validação de qualidade
   await sendEventWithRetry('initiate_checkout', eventData);
+  console.log('✅ trackCheckout - DataLayer enviado com sucesso!');
 
   // ENVIAR DADOS DIRETAMENTE PARA O SERVER-SIDE (Stape) - VERSÃO OTIMIZADA PARA FACEBOOK PIXEL
   if (typeof window !== 'undefined') {
     try {
-      console.log('🚀 Tentando enviar dados para o server-side...');
-      console.log('📊 metaFormattedData completo:', metaFormattedData);
-      console.log('📧 Email (em):', metaFormattedData.em);
-      console.log('📞 Telefone (ph):', metaFormattedData.ph);
-      console.log('👤 Nome (fn):', metaFormattedData.fn);
-      console.log('👥 Sobrenome (ln):', metaFormattedData.ln);
+      console.log('🚀 trackCheckout - ENVIANDO DADOS PARA O SERVER-SIDE...');
+      console.log('📊 trackCheckout - metaFormattedData completo:', metaFormattedData);
+      console.log('📧 trackCheckout - Email (em):', metaFormattedData.em);
+      console.log('📞 trackCheckout - Telefone (ph):', metaFormattedData.ph);
+      console.log('👤 trackCheckout - Nome (fn):', metaFormattedData.fn);
+      console.log('👥 trackCheckout - Sobrenome (ln):', metaFormattedData.ln);
       
       // Preparar dados no formato EXATO que o Facebook Pixel espera no server-side
       const serverSideData = {
@@ -318,8 +326,10 @@ const trackCheckout = async (userData) => {
         }
       };
       
+      console.log('🌐 trackCheckout - Enviando para server-side URL: https://gtm-GTM-567XZCDX.stape.io/event');
+      
       // Enviar dados para o server-side via fetch - URL principal
-      const response = await fetch('https://gtm-GTM-WTL9CQ7W.stape.io/event', {
+      const response = await fetch('https://gtm-GTM-567XZCDX.stape.io/event', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -327,60 +337,30 @@ const trackCheckout = async (userData) => {
         body: JSON.stringify(serverSideData)
       });
       
-      console.log('✅ Resposta do server-side:', response.status, response.statusText);
+      console.log('📡 trackCheckout - Resposta do server-side:', response.status, response.statusText);
       
       if (response.ok) {
         const result = await response.json();
-        console.log('✅ Dados enviados para o server-side com sucesso!', result);
+        console.log('✅ trackCheckout - Dados enviados para o server-side com sucesso!', result);
       } else {
-        console.error('❌ Erro na resposta do server-side:', response.status, response.statusText);
+        console.error('❌ trackCheckout - Erro na resposta do server-side:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('❌ trackCheckout - Detalhes do erro:', errorText);
       }
-      
-      console.log('📊 Dados enviados para Facebook Pixel:', {
-        em: metaFormattedData.em,
-        ph: metaFormattedData.ph,
-        fn: metaFormattedData.fn,
-        ln: metaFormattedData.ln,
-        ct: metaFormattedData.ct,
-        st: metaFormattedData.st,
-        zp: metaFormattedData.zp,
-        country: metaFormattedData.country
-      });
-      
-      // Também enviar via dataLayer para garantir que o GTM capture
-      const dataLayerPayload = {
-        event: 'initiate_checkout',
-        event_id: eventId,
-        user_data: metaFormattedData,
-        facebook_pixel_data: {
-          event_name: 'InitiateCheckout',
-          user_data: {
-            em: metaFormattedData.em,
-            ph: metaFormattedData.ph,
-            fn: metaFormattedData.fn,
-            ln: metaFormattedData.ln,
-            ct: metaFormattedData.ct,
-            st: metaFormattedData.st,
-            zp: metaFormattedData.zp,
-            country: metaFormattedData.country
-          }
-        }
-      };
-      
-      console.log('🚀 ENVIANDO PARA DATALAYER:');
-      console.log('Payload completo:', dataLayerPayload);
-      console.log('user_data:', dataLayerPayload.user_data);
-      console.log('facebook_pixel_data:', dataLayerPayload.facebook_pixel_data);
-      
-      window.dataLayer.push(dataLayerPayload);
+      console.log('🎉 trackCheckout - PROCESSO CONCLUÍDO COM SUCESSO!');
+      console.log('🎯 trackCheckout - Resumo do envio:');
+      console.log('   ✅ DataLayer: Enviado');
+      console.log('   ✅ Server-side: Enviado');
+      console.log('   ✅ Event ID:', eventId);
+      console.log('   ✅ Dados do usuário: Email=' + metaFormattedData.em + ', Telefone=' + metaFormattedData.ph + ', Nome=' + metaFormattedData.fn + ' ' + metaFormattedData.ln);
       
     } catch (error) {
-      console.error('❌ Erro ao enviar dados para o server-side:', error);
+      console.error('❌ trackCheckout - Erro ao enviar dados para o server-side:', error);
       
       // Tentar URL alternativa
       try {
-        console.log('🔄 Tentando URL alternativa...');
-        const response2 = await fetch('https://collect.stape.io/v2/s/GTM-WTL9CQ7W/event', {
+        console.log('🔄 trackCheckout - Tentando URL alternativa...');
+        const response2 = await fetch('https://collect.stape.io/v2/s/GTM-567XZCDX/event', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -419,11 +399,13 @@ const trackCheckout = async (userData) => {
         
         console.log('✅ URL alternativa funcionou!', response2.status);
       } catch (error2) {
-        console.error('❌ URL alternativa também falhou:', error2);
+        console.error('❌ trackCheckout - URL alternativa também falhou:', error2);
       }
     }
   }
-
+  
+  console.log('🏁 trackCheckout - FUNÇÃO FINALIZADA');
+  
   if (META_CONFIG.TRACKING.enableDebugLogs) {
     console.log('🛒 Initiate Checkout: Enviado com formato OTIMIZADO para Facebook Pixel!');
     console.log('🔑 Event ID:', eventId);
