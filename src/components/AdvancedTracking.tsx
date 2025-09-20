@@ -185,13 +185,17 @@ const trackViewContent = async (viewContentHasBeenTracked) => {
   const eventData = {
     event: 'view_content',
     event_id: eventId, // Adicionar event_id para desduplicação
-    ecommerce: {
-      items: [{
-        item_id: '6080425',
-        item_name: 'Sistema de Controle de Trips - Maracujá',
-        price: 39.90,
+    custom_data: {
+      currency: 'BRL',
+      value: 39.90,
+      content_name: 'Sistema de Controle de Trips - Maracujá',
+      content_category: 'E-book',
+      content_ids: ['6080425'],
+      num_items: 1,
+      contents: [{
+        id: '6080425',
         quantity: 1,
-        currency: 'BRL'
+        item_price: 39.90
       }]
     },
     // ✅ Usar formato META padronizado (igual ao InitiateCheckout)
@@ -249,14 +253,18 @@ const trackCheckout = async (userData) => {
   const eventData = {
     event: 'initiate_checkout',
     event_id: eventId, // Mesmo padrão de Event ID
-    ecommerce: {
-      items: [{
-        item_id: '6080425',
-        item_name: 'Sistema de Controle de Trips - Maracujá',
-        price: 39.90,
+    custom_data: {
+      currency: 'BRL',
+      value: 39.90,
+      content_name: 'Sistema de Controle de Trips - Maracujá',
+      content_category: 'E-book',
+      content_ids: ['6080425'],
+      num_items: 1,
+      contents: [{
+        id: '6080425',
         quantity: 1,
-        currency: 'BRL'
-      }],
+        item_price: 39.90
+      }]
     },
     // ✅ Usar formato META que o Facebook reconhece
     user_data: metaFormattedData

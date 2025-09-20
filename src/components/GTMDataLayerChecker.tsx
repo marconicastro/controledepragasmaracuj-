@@ -33,7 +33,7 @@ export default function GTMDataLayerChecker() {
         console.log(`📋 Evento ${index + 1} (${event.event}):`);
         console.log('   - Event ID:', event.event_id);
         console.log('   - User Data:', event.user_data);
-        console.log('   - Ecommerce:', event.ecommerce);
+        console.log('   - Custom Data:', event.custom_data);
         
         if (event.user_data) {
           const { em, ph, fn, ln, ct, st, zp, country, fbc, fbp } = event.user_data;
@@ -46,6 +46,15 @@ export default function GTMDataLayerChecker() {
           console.log('   - País:', country ? '✅' : '❌');
           console.log('   - FBC:', fbc ? '✅' : '❌');
           console.log('   - FBP:', fbp ? '✅' : '❌');
+        }
+        
+        if (event.custom_data) {
+          const { currency, value, content_name, content_category, contents } = event.custom_data;
+          console.log('   - Moeda:', currency ? '✅' : '❌');
+          console.log('   - Valor:', value ? '✅' : '❌');
+          console.log('   - Nome do conteúdo:', content_name ? '✅' : '❌');
+          console.log('   - Categoria:', content_category ? '✅' : '❌');
+          console.log('   - Conteúdos:', contents ? '✅' : '❌');
         }
       });
     };
