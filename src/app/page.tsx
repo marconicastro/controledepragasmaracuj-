@@ -89,20 +89,44 @@ export default function App() {
     console.log('📧 Adicionando parâmetro email:', formData.email);
     finalUrl.searchParams.set('email', formData.email);
     
-    // Para o Telefone: APENAS os parâmetros 'phone_local_code' e 'phone_number'
+    // Para o Telefone: Formato esperado pela máscara "99 99999-9999"
     const phoneClean = formData.phone.replace(/\D/g, '');
     console.log('Telefone limpo:', phoneClean);
     
     if (phoneClean.length >= 10 && phoneClean.length <= 11) {
       // Extrair DDD e número
       const ddd = phoneClean.substring(0, 2);
-      const numero = phoneClean.substring(2);
+      const numeroCompleto = phoneClean.substring(2);
       
       console.log('DDD:', ddd);
-      console.log('Número:', numero);
+      console.log('Número completo:', numeroCompleto);
       
-      finalUrl.searchParams.set('phone_local_code', ddd);
-      finalUrl.searchParams.set('phone_number', numero);
+      // Formatar para o padrão da máscara: "77 99827-6042"
+      if (numeroCompleto.length === 9) {
+        // Celular com 9: 998276042 -> 77 99827-6042
+        const primeiraParte = numeroCompleto.substring(0, 5); // 99827
+        const segundaParte = numeroCompleto.substring(5); // 6042
+        const numeroFormatado = `${ddd} ${primeiraParte}-${segundaParte}`;
+        
+        console.log('Número formatado:', numeroFormatado);
+        
+        // Enviar o telefone completo formatado no campo phone_number
+        finalUrl.searchParams.set('phone_number', numeroFormatado);
+      } else if (numeroCompleto.length === 8) {
+        // Fixo: 98276042 -> 77 9827-6042
+        const primeiraParte = numeroCompleto.substring(0, 4); // 9827
+        const segundaParte = numeroCompleto.substring(4); // 6042
+        const numeroFormatado = `${ddd} ${primeiraParte}-${segundaParte}`;
+        
+        console.log('Número formatado:', numeroFormatado);
+        
+        // Enviar o telefone completo formatado no campo phone_number
+        finalUrl.searchParams.set('phone_number', numeroFormatado);
+      } else {
+        // Fallback: enviar DDD + número sem formatação
+        const numeroFormatado = `${ddd} ${numeroCompleto}`;
+        finalUrl.searchParams.set('phone_number', numeroFormatado);
+      }
     }
 
     // 3. Parâmetros adicionais

@@ -57,16 +57,12 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
     resolver: zodResolver(checkoutFormSchema),
   });
 
-  // Função para formatar telefone - MELHORADA
+  // Função para formatar telefone
   const formatPhone = (value: string) => {
     const cleaned = value.replace(/\D/g, '');
     
-    // Verificar se tem 11 dígitos (celular com 9) ou 10 dígitos (fixo)
-    if (cleaned.length === 0) {
-      return value;
-    }
+    if (cleaned.length === 0) return value;
     
-    // Limitar a 11 dígitos no máximo
     const limitedCleaned = cleaned.substring(0, 11);
     
     if (limitedCleaned.length <= 2) {
@@ -76,13 +72,11 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
       const firstPart = limitedCleaned.substring(2);
       return `(${ddd}) ${firstPart}`;
     } else if (limitedCleaned.length <= 10) {
-      // Formato fixo: (11) 9999-8888
       const ddd = limitedCleaned.substring(0, 2);
       const firstPart = limitedCleaned.substring(2, 6);
       const secondPart = limitedCleaned.substring(6);
       return `(${ddd}) ${firstPart}-${secondPart}`;
     } else {
-      // Formato celular: (11) 99999-8888
       const ddd = limitedCleaned.substring(0, 2);
       const firstPart = limitedCleaned.substring(2, 7);
       const secondPart = limitedCleaned.substring(7);
@@ -223,7 +217,7 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
             </Label>
             <Input
               id="phone"
-              placeholder="(11) 99999-8888"
+              placeholder="(77) 99827-606"
               {...register('phone')}
               onChange={handlePhoneChange}
               maxLength={15}

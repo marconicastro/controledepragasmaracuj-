@@ -66,13 +66,13 @@ export const META_CONFIG = {
   // Configurações de Hotmart
   HOTMART: {
     // URL base do checkout
-    checkoutUrl: 'https://pay.hotmart.com/I101398692S',
+    checkoutUrl: 'https://checkout.maracujazeropragas.com/VCCL1O8SC7KX',
     
     // Parâmetros obrigatórios para pré-preenchimento
     requiredParams: ['name', 'email'],
     
     // Parâmetros opcionais para pré-preenchimento
-    optionalParams: ['phone_local_code', 'phone_number', 'city', 'state', 'zip'],
+    optionalParams: ['phone_number', 'city', 'state', 'zip'],
     
     // Habilitar validação de parâmetros
     enableParamValidation: true,
