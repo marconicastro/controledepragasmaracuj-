@@ -316,7 +316,7 @@ const trackCheckout = async (userData) => {
       const serverSideData = {
         event_name: 'InitiateCheckout', // Nome do evento padrão do Facebook
         event_id: eventId,
-        pixel_id: '714277868320104', // ID do Pixel do Facebook
+        pixel_id: '642933108377475', // ID do Pixel do Facebook
         user_data: {
           // Dados do usuário no formato que o Facebook Pixel reconhece
           em: metaFormattedData.em,
@@ -354,8 +354,8 @@ const trackCheckout = async (userData) => {
       
       console.log('🚀 Enviando para server-side com formato:', JSON.stringify(serverSideData, null, 2));
       
-      // Enviar dados para o server-side via fetch - URL principal
-      const response = await fetch('https://bfbsewli.sag.stape.io/event', {
+      // Enviar dados para o nosso server-side API que formata corretamente para Facebook
+      const response = await fetch('/api/facebook-pixel', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
