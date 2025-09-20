@@ -2,6 +2,7 @@
 import { useEffect, useRef } from 'react';
 import META_CONFIG, { formatUserDataForMeta, validateMetaConfig } from '@/lib/metaConfig';
 import { getAllTrackingParams, initializeTracking, getCachedGeographicData, getHighQualityLocationData, validateDataQuality } from '@/lib/cookies';
+import { validateAndFixFacebookEvent, debugFacebookEvent } from '@/lib/facebookPixelValidation';
 
 // --- FUNÇÕES HELPER PARA O DATALAYER ---
 // Função para gerar event_id único para desduplicação
@@ -89,7 +90,10 @@ const sendEventWithRetry = async (eventName: string, eventData: any, maxRetries 
       }
       
       // Enviar evento com dados de qualidade aceitável
-      window.dataLayer.push(eventData);
+      const validatedEventData = validateAndFixFacebookEvent(eventData);
+      debugFacebookEvent(eventName, validatedEventData);
+      
+      window.dataLayer.push(validatedEventData);
       
       console.log(`✅ Evento ${eventName} enviado com sucesso!`);
       console.log(`📊 Qualidade final: ${validation.score}%`);
@@ -190,9 +194,9 @@ const trackViewContent = async (viewContentHasBeenTracked) => {
       value: 39.90,
       content_name: 'Sistema de Controle de Trips - Maracujá',
       content_category: 'E-book',
-      content_ids: ['6080425'],
-      num_items: 1,
-      contents: [{
+      content_ids: ['6080425'], // ✅ ARRAY CORRETO
+      num_items: '1',
+      contents: [{ // ✅ ARRAY CORRETO
         id: '6080425',
         quantity: 1,
         item_price: 39.90
@@ -278,14 +282,26 @@ const trackCheckout = async (userData) => {
         custom_data: {
           currency: 'BRL',
           value: 39.90,
-          content_name: 'Sistema de Controle de Trips - Maracujá'
+          content_name: 'E-book Sistema de Controle de Trips - Maracujá',
+          content_category: 'E-book',
+          content_ids: ['ebook-controle-trips'], // ✅ ARRAY CORRETO
+          num_items: '1',
+          items: [{ // ✅ ARRAY CORRETO
+            item_id: 'ebook-controle-trips',
+            item_name: 'E-book Sistema de Controle de Trips',
+            quantity: 1,
+            price: 39.90,
+            item_category: 'E-book',
+            item_brand: 'Maracujá Zero Pragas',
+            currency: 'BRL'
+          }]
         }
       };
       
       console.log('🚀 Enviando para server-side com formato:', JSON.stringify(serverSideData, null, 2));
       
       // Enviar dados para o server-side via fetch - URL principal
-      const response = await fetch('https://gtm-GTM-WTL9CQ7W.stape.io/event', {
+      const response = await fetch('https://bfbsewli.sag.stape.io/event', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -325,7 +341,19 @@ const trackCheckout = async (userData) => {
     custom_data: {
       currency: 'BRL',
       value: 39.90,
-      content_name: 'Sistema de Controle de Trips - Maracujá'
+      content_name: 'E-book Sistema de Controle de Trips - Maracujá',
+      content_category: 'E-book',
+      content_ids: ['ebook-controle-trips'], // ✅ ARRAY CORRETO
+      num_items: '1',
+      items: [{ // ✅ ARRAY CORRETO
+        item_id: 'ebook-controle-trips',
+        item_name: 'E-book Sistema de Controle de Trips',
+        quantity: 1,
+        price: 39.90,
+        item_category: 'E-book',
+        item_brand: 'Maracujá Zero Pragas',
+        currency: 'BRL'
+      }]
     },
     // ✅ Usar formato META que o Facebook reconhece
     user_data: metaFormattedData

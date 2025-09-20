@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import GoogleTagManager from "@/components/GoogleTagManager";
 import AdvancedTracking from "@/components/AdvancedTracking";
 import GTMDataLayerChecker from "@/components/GTMDataLayerChecker";
+import FacebookPixelDebugger from "@/components/FacebookPixelDebugger";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -50,6 +51,7 @@ export default function RootLayout({
       >
         <AdvancedTracking />
         <GTMDataLayerChecker />
+        <FacebookPixelDebugger />
         {children}
         <Toaster />
       </body>
