@@ -249,34 +249,10 @@ const trackCheckout = async (userData) => {
     external_id: userData.external_id
   };
   
-  // ENVIAR VIA DATALAYER (GTM) com formato META para Facebook e sistema de retry
-  const eventData = {
-    event: 'initiate_checkout',
-    event_id: eventId, // Mesmo padrão de Event ID
-    custom_data: {
-      currency: 'BRL',
-      value: 39.90,
-      content_name: 'Sistema de Controle de Trips - Maracujá',
-      content_category: 'E-book',
-      content_ids: ['6080425'],
-      num_items: 1,
-      contents: [{
-        id: '6080425',
-        quantity: 1,
-        item_price: 39.90
-      }]
-    },
-    // ✅ Usar formato META que o Facebook reconhece
-    user_data: metaFormattedData
-  };
-  
-  // Enviar com sistema de retry e validação de qualidade
-  await sendEventWithRetry('initiate_checkout', eventData);
-
-  // ENVIAR DADOS DIRETAMENTE PARA O SERVER-SIDE (Stape) - VERSÃO OTIMIZADA PARA FACEBOOK PIXEL
+  // ENVIAR DADOS DIRETAMENTE PARA O SERVER-SIDE (Stape) PRIMEIRO - VERSÃO OTIMIZADA PARA FACEBOOK PIXEL
   if (typeof window !== 'undefined') {
     try {
-      console.log('🚀 Tentando enviar dados para o server-side...');
+      console.log('🚀 Enviando dados para o server-side PRIMEIRO...');
       
       // Preparar dados no formato EXATO que o Facebook Pixel espera no server-side
       const serverSideData = {
@@ -302,14 +278,11 @@ const trackCheckout = async (userData) => {
         custom_data: {
           currency: 'BRL',
           value: 39.90,
-          content_type: 'product',
-          contents: [{
-            id: '6080425',
-            quantity: 1,
-            item_price: 39.90
-          }]
+          content_name: 'Sistema de Controle de Trips - Maracujá'
         }
       };
+      
+      console.log('🚀 Enviando para server-side com formato:', JSON.stringify(serverSideData, null, 2));
       
       // Enviar dados para o server-side via fetch - URL principal
       const response = await fetch('https://gtm-GTM-WTL9CQ7W.stape.io/event', {
@@ -340,82 +313,37 @@ const trackCheckout = async (userData) => {
         country: metaFormattedData.country
       });
       
-      // Também enviar via dataLayer para garantir que o GTM capture
-      window.dataLayer.push({
-        event: 'initiate_checkout',
-        event_id: eventId,
-        user_data: metaFormattedData,
-        facebook_pixel_data: {
-          event_name: 'InitiateCheckout',
-          user_data: {
-            em: metaFormattedData.em,
-            ph: metaFormattedData.ph,
-            fn: metaFormattedData.fn,
-            ln: metaFormattedData.ln,
-            ct: metaFormattedData.ct,
-            st: metaFormattedData.st,
-            zp: metaFormattedData.zp,
-            country: metaFormattedData.country
-          }
-        }
-      });
-      
     } catch (error) {
       console.error('❌ Erro ao enviar dados para o server-side:', error);
-      
-      // Tentar URL alternativa
-      try {
-        console.log('🔄 Tentando URL alternativa...');
-        const response2 = await fetch('https://collect.stape.io/v2/s/GTM-WTL9CQ7W/event', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            event_name: 'InitiateCheckout',
-            event_id: eventId,
-            pixel_id: '714277868320104',
-            user_data: {
-              em: metaFormattedData.em,
-              ph: metaFormattedData.ph,
-              fn: metaFormattedData.fn,
-              ln: metaFormattedData.ln,
-              ct: metaFormattedData.ct,
-              st: metaFormattedData.st,
-              zp: metaFormattedData.zp,
-              country: metaFormattedData.country,
-              client_ip_address: '',
-              client_user_agent: navigator.userAgent,
-              fbc: metaFormattedData.fbc,
-              fbp: metaFormattedData.fbp,
-              external_id: metaFormattedData.external_id
-            },
-            custom_data: {
-              currency: 'BRL',
-              value: 39.90,
-              content_type: 'product',
-              contents: [{
-                id: '6080425',
-                quantity: 1,
-                item_price: 39.90
-              }]
-            }
-          })
-        });
-        
-        console.log('✅ URL alternativa funcionou!', response2.status);
-      } catch (error2) {
-        console.error('❌ URL alternativa também falhou:', error2);
-      }
     }
   }
+
+  // ENVIAR VIA DATALAYER (GTM) DEPOIS - com formato META para Facebook e sistema de retry
+  const eventData = {
+    event: 'initiate_checkout',
+    event_id: eventId, // Mesmo padrão de Event ID
+    custom_data: {
+      currency: 'BRL',
+      value: 39.90,
+      content_name: 'Sistema de Controle de Trips - Maracujá'
+    },
+    // ✅ Usar formato META que o Facebook reconhece
+    user_data: metaFormattedData
+  };
+  
+  // Pequeno atraso para garantir que server-side seja processado primeiro
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  // Enviar com sistema de retry e validação de qualidade
+  await sendEventWithRetry('initiate_checkout', eventData);
 
   if (META_CONFIG.TRACKING.enableDebugLogs) {
     console.log('🛒 Initiate Checkout: Enviado com formato OTIMIZADO para Facebook Pixel!');
     console.log('🔑 Event ID:', eventId);
     console.log('📊 Dados formatados (META padrão):', metaFormattedData);
     console.log('🌍 Dados geográficos usados:', locationData);
-    console.log('📈 Expectativa: Score deve subir para 8.5+ com dados completos enviados diretamente ao Facebook Pixel');
+    console.log('📈 Ordem de envio: 1° Server-side, 2° Client-side (com 500ms de atraso)');
+    console.log('🎯 Expectativa: Server-side deve ser priorizado e não desduplicado!');
     
     // Log de confirmação do formato correto
     console.log('🎯 Dados do formulário enviados para Facebook Pixel:');
@@ -430,7 +358,7 @@ const trackCheckout = async (userData) => {
     console.log('   - FBC (fbc):', metaFormattedData.fbc);
     console.log('   - FBP (fbp):', metaFormattedData.fbp);
     console.log('   - External ID:', metaFormattedData.external_id);
-    console.log('🚀 Dados enviados via server-side (Stape) e dataLayer para garantir entrega ao Facebook');
+    console.log('🚀 Dados enviados: Server-side PRIMEIRO (prioridade), depois Client-side (backup)');
   }
 };
 
