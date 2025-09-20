@@ -148,23 +148,32 @@ function getFormLocationData(): {
   if (typeof document === 'undefined') return null;
   
   try {
-    // Verificar se há elementos do formulário na página
-    const cityElement = document.querySelector('input[name="city"]') as HTMLInputElement;
-    const stateElement = document.querySelector('input[name="state"]') as HTMLInputElement;
-    const zipElement = document.querySelector('input[name="cep"]') as HTMLInputElement;
+    // Verificar se há elementos do formulário na página usando IDs (react-hook-form)
+    const cityElement = document.querySelector('#city') as HTMLInputElement;
+    const stateElement = document.querySelector('#state') as HTMLInputElement;
+    const zipElement = document.querySelector('#cep') as HTMLInputElement;
     
     const city = cityElement?.value?.trim();
     const state = stateElement?.value?.trim();
     const zip = zipElement?.value?.replace(/\D/g, '');
     
+    console.log('🔍 Procurando dados do formulário:');
+    console.log('   - Elemento cidade encontrado:', !!cityElement);
+    console.log('   - Elemento estado encontrado:', !!stateElement);
+    console.log('   - Elemento CEP encontrado:', !!zipElement);
+    console.log('   - Valores:', { city, state, zip });
+    
     // Retornar apenas se todos os campos estiverem preenchidos
     if (city && state && zip && zip.length === 8) {
+      console.log('✅ Dados completos do formulário encontrados!');
       return {
         city: city,
         state: state.toUpperCase(),
         zip: zip,
         country: 'BR'
       };
+    } else {
+      console.log('❌ Dados incompletos do formulário:', { city: !!city, state: !!state, zip: !!zip, zipLength: zip?.length });
     }
   } catch (error) {
     console.warn('⚠️ Erro ao obter dados do formulário:', error);

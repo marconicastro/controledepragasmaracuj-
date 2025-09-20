@@ -171,8 +171,17 @@ export default function App() {
       zip: formData.cep.replace(/\D/g, '')
     };
 
+    // Obter dados de localização de alta qualidade para incluir no rastreamento
+    let locationData = {
+      city: formData.city,
+      state: formData.state,
+      zip: formData.cep.replace(/\D/g, ''),
+      country: 'BR'
+    };
+
     const enrichedUserData = {
       ...userData,
+      ...locationData, // Incluir dados geográficos!
       fbc: fbc,
       fbp: fbp,
       ga_client_id: clientId,
@@ -180,6 +189,24 @@ export default function App() {
     };
 
     console.log('📊 Dados do usuário enriquecidos para Meta:', enrichedUserData);
+    console.log('🌍 Dados geográficos incluídos:', {
+      city: enrichedUserData.city,
+      state: enrichedUserData.state,
+      zip: enrichedUserData.zip,
+      country: enrichedUserData.country
+    });
+    console.log('📧 Dados de contato:', {
+      email: enrichedUserData.email,
+      phone: enrichedUserData.phone,
+      firstName: enrichedUserData.firstName,
+      lastName: enrichedUserData.lastName
+    });
+    console.log('🔑 Dados de rastreamento:', {
+      fbc: enrichedUserData.fbc,
+      fbp: enrichedUserData.fbp,
+      ga_client_id: enrichedUserData.ga_client_id,
+      external_id: enrichedUserData.external_id
+    });
 
     // Disparar evento de checkout com dados do usuário enriquecidos
     if (typeof window !== 'undefined' && window.advancedTracking) {

@@ -5,6 +5,19 @@ import { getAllTrackingParams, initializeTracking, getCachedGeographicData, getH
 import { validateAndFixFacebookEvent, debugFacebookEvent } from '@/lib/facebookPixelValidation';
 
 // --- FUNÇÕES HELPER PARA O DATALAYER ---
+// Função para limpar dados removendo valores vazios e undefined
+const cleanUserData = (userData: any) => {
+  const cleaned = { ...userData };
+  
+  Object.keys(cleaned).forEach(key => {
+    if (cleaned[key] === undefined || cleaned[key] === '' || cleaned[key] === null) {
+      delete cleaned[key];
+    }
+  });
+  
+  return cleaned;
+};
+
 // Função para gerar event_id único para desduplicação
 const generateEventId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
@@ -93,6 +106,12 @@ const sendEventWithRetry = async (eventName: string, eventData: any, maxRetries 
       const validatedEventData = validateAndFixFacebookEvent(eventData);
       debugFacebookEvent(eventName, validatedEventData);
       
+      // Log detalhado dos dados antes de enviar
+      console.log(`📤 Enviando evento ${eventName} com dados limpos:`);
+      console.log('🔑 Event ID:', validatedEventData.event_id);
+      console.log('👤 User Data:', validatedEventData.user_data);
+      console.log('🛍️ Custom Data:', validatedEventData.custom_data);
+      
       window.dataLayer.push(validatedEventData);
       
       console.log(`✅ Evento ${eventName} enviado com sucesso!`);
@@ -148,7 +167,7 @@ const trackViewContent = async (viewContentHasBeenTracked) => {
   // Obter todos os parâmetros de rastreamento (incluindo FBC, FBP, etc.)
   const trackingParams = await getAllTrackingParams();
   
-  // Garantir captura do FBC - TENTATIVA ADICIONAL
+  // Garantir captura do FBC - TENTATIVA AGRESSIVA
   let fbc = trackingParams.fbc;
   
   // Se não tiver FBC, tentar capturar da URL novamente
@@ -166,12 +185,27 @@ const trackViewContent = async (viewContentHasBeenTracked) => {
       expirationDate.setDate(expirationDate.getDate() + 90);
       document.cookie = `_fbc=${fbc}; expires=${expirationDate.toUTCString()}; path=/; domain=${window.location.hostname}; SameSite=Lax`;
       
-      console.log('🎯 FBC capturado e salvo:', fbc);
+      console.log('🎯 FBC capturado e salvo no ViewContent:', fbc);
     }
   }
   
+  // Se ainda não tiver FBC, tentar obter do cookie novamente
+  if (!fbc && typeof window !== 'undefined') {
+    const fbcCookie = document.cookie.match(new RegExp('(^| )_fbc=([^;]+)'));
+    if (fbcCookie) {
+      fbc = fbcCookie[2];
+      console.log('🎯 FBC obtido do cookie no ViewContent:', fbc);
+    }
+  }
+  
+  // Log do status do FBC para depuração
+  console.log('📊 Status FBC no ViewContent:', fbc ? '✅ Presente' : '❌ Ausente');
+  if (fbc) {
+    console.log('🔑 FBC value:', fbc);
+  }
+  
   // Usar o MESMO formato do InitiateCheckout para consistência
-  const metaFormattedData = {
+  const metaFormattedData = cleanUserData({
     // ✅ Dados de rastreamento para matching (iguais ao InitiateCheckout)
     fbc: fbc, // Usar FBC garantido
     fbp: trackingParams.fbp,
@@ -183,7 +217,7 @@ const trackViewContent = async (viewContentHasBeenTracked) => {
     st: locationData.state,
     zp: locationData.zip,
     country: locationData.country
-  };
+  });
   
   // Enviar via DataLayer (GTM) com formato padronizado e retry
   const eventData = {
@@ -233,25 +267,45 @@ const trackCheckout = async (userData) => {
   const locationData = await getHighQualityLocationData();
   
   // Preparar dados no FORMATO META que o Facebook reconhece - MELHORADO
-  const metaFormattedData = {
+  const metaFormattedData = cleanUserData({
     // ✅ Dados do usuário no formato que o Facebook entende
-    em: userData.email ? userData.email.toLowerCase().trim() : '',           // Email - Facebook entende "em"
-    ph: userData.phone ? userData.phone.replace(/\D/g, '') : '',              // Telefone - Facebook entende "ph"
-    fn: userData.firstName ? userData.firstName.trim() : '',                    // Primeiro nome - Facebook entende "fn"
-    ln: userData.lastName ? userData.lastName.trim() : '',                     // Sobrenome - Facebook entende "ln"
+    em: userData.email ? userData.email.toLowerCase().trim() : undefined,           // Email - apenas se existir
+    ph: userData.phone ? userData.phone.replace(/\D/g, '') : undefined,              // Telefone - apenas se existir
+    fn: userData.firstName ? userData.firstName.trim() : undefined,                    // Primeiro nome - apenas se existir
+    ln: userData.lastName ? userData.lastName.trim() : undefined,                     // Sobrenome - apenas se existir
     
     // ✅ Dados geográficos - usar dados de ALTA QUALIDADE com fallback para formulário
-    ct: locationData.city || userData.city || '',           // Cidade - Facebook entende "ct"
-    st: locationData.state || userData.state || '',          // Estado - Facebook entende "st"
-    zp: locationData.zip || userData.zip || '',            // CEP - Facebook entende "zp"
-    country: locationData.country || 'BR',                 // País - Facebook entende "country"
+    ct: locationData.city || userData.city || undefined,           // Cidade - apenas se existir
+    st: locationData.state || userData.state || undefined,          // Estado - apenas se existir
+    zp: locationData.zip || userData.zip || undefined,            // CEP - apenas se existir
+    country: locationData.country || userData.country || 'BR',     // País - sempre BR
     
     // ✅ Dados de rastreamento para matching
     fbc: userData.fbc,
     fbp: userData.fbp,
     ga_client_id: userData.ga_client_id,
     external_id: userData.external_id
-  };
+  });
+  
+  // Log detalhado para depuração
+  console.log('🌍 Dados geográficos disponíveis:');
+  console.log('   - LocationData API:', locationData);
+  console.log('   - LocationData Formulário:', {
+    city: userData.city,
+    state: userData.state,
+    zip: userData.zip,
+    country: userData.country
+  });
+  console.log('📧 Dados do usuário disponíveis:');
+  console.log('   - Email:', userData.email);
+  console.log('   - Telefone:', userData.phone);
+  console.log('   - Nome:', userData.firstName, userData.lastName);
+  console.log('🔑 Dados de rastreamento disponíveis:');
+  console.log('   - FBC:', userData.fbc);
+  console.log('   - FBP:', userData.fbp);
+  console.log('   - GA Client ID:', userData.ga_client_id);
+  console.log('   - External ID:', userData.external_id);
+  console.log('✅ Dados finais após limpeza:', metaFormattedData);
   
   // ENVIAR DADOS DIRETAMENTE PARA O SERVER-SIDE (Stape) PRIMEIRO - VERSÃO OTIMIZADA PARA FACEBOOK PIXEL
   if (typeof window !== 'undefined') {

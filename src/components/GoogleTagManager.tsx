@@ -40,7 +40,7 @@ export default function GoogleTagManager({ gtmId = 'GTM-567XZCDX' }: GoogleTagMa
         // 2. Obter todos os parâmetros de rastreamento com FBC garantido
         const trackingParams = await getAllTrackingParams();
         
-        // 3. Garantir captura do FBC - TENTATIVA ADICIONAL
+        // 3. Garantir captura do FBC - TENTATIVA AGRESSIVA
         let fbc = trackingParams.fbc;
         
         // Se não tiver FBC, tentar capturar da URL novamente
@@ -63,6 +63,22 @@ export default function GoogleTagManager({ gtmId = 'GTM-567XZCDX' }: GoogleTagMa
             // Atualizar trackingParams com o FBC capturado
             trackingParams.fbc = fbc;
           }
+        }
+        
+        // Se ainda não tiver FBC, tentar obter do cookie novamente
+        if (!fbc && typeof window !== 'undefined') {
+          const fbcCookie = document.cookie.match(new RegExp('(^| )_fbc=([^;]+)'));
+          if (fbcCookie) {
+            fbc = fbcCookie[2];
+            trackingParams.fbc = fbc;
+            console.log('🎯 FBC obtido do cookie no PageView:', fbc);
+          }
+        }
+        
+        // Log do status do FBC para depuração
+        console.log('📊 Status FBC no PageView:', fbc ? '✅ Presente' : '❌ Ausente');
+        if (fbc) {
+          console.log('🔑 FBC value:', fbc);
         }
         
         // 4. Gerar event_id consistente para correlação
