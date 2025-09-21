@@ -23,8 +23,8 @@ export const META_CONFIG = {
     enablePurchase: true,
     enableLead: true,
     
-    // Delay para view_content (em milissegundos)
-    viewContentDelay: 1000,
+    // Delay para view_content (em milissegundos) - aumentado para garantir FBC
+    viewContentDelay: 2000,
     
     // Habilitar console logs para depuração
     enableDebugLogs: true, // Habilitado para análise

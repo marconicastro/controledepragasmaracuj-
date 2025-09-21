@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import META_CONFIG, { formatUserDataForMeta, validateMetaConfig } from '@/lib/metaConfig';
-import { getAllTrackingParams, initializeTracking, getCachedGeographicData, getHighQualityLocationData, validateDataQuality } from '@/lib/cookies';
+import { getAllTrackingParams, initializeTracking, getCachedGeographicData, getHighQualityLocationData, validateDataQuality, waitForFBCReady } from '@/lib/cookies';
 import { validateAndFixFacebookEvent, debugFacebookEvent } from '@/lib/facebookPixelValidation';
 
 // --- FUNÇÕES HELPER PARA O DATALAYER ---
@@ -161,42 +161,22 @@ const trackViewContent = async (viewContentHasBeenTracked) => {
   // Gerar event_id único para desduplicação
   const eventId = generateEventId();
   
-  // Obter dados de localização de ALTA QUALIDADE (prioridade formulário > cache > API)
+  console.log('🎯 Iniciando envio de ViewContent com garantia de FBC...');
+  
+  // 1. Inicializar tracking primeiro
+  await initializeTracking();
+  
+  // 2. GARANTIR FBC com retry inteligente (CRÍTICO)
+  const fbc = await waitForFBCReady();
+  
+  // 3. Obter dados de localização de ALTA QUALIDADE (prioridade formulário > cache > API)
   const locationData = await getHighQualityLocationData();
   
-  // Obter todos os parâmetros de rastreamento (incluindo FBC, FBP, etc.)
+  // 4. Obter todos os parâmetros de rastreamento com FBC garantido
   const trackingParams = await getAllTrackingParams();
   
-  // Garantir captura do FBC - TENTATIVA AGRESSIVA
-  let fbc = trackingParams.fbc;
-  
-  // Se não tiver FBC, tentar capturar da URL novamente
-  if (!fbc && typeof window !== 'undefined') {
-    const urlParams = new URLSearchParams(window.location.search);
-    const fbclid = urlParams.get('fbclid');
-    
-    if (fbclid) {
-      // Criar FBC no formato correto
-      const timestamp = Date.now();
-      fbc = `fb.1.${timestamp}.${fbclid}`;
-      
-      // Salvar no cookie para futuros eventos
-      const expirationDate = new Date();
-      expirationDate.setDate(expirationDate.getDate() + 90);
-      document.cookie = `_fbc=${fbc}; expires=${expirationDate.toUTCString()}; path=/; domain=${window.location.hostname}; SameSite=Lax`;
-      
-      console.log('🎯 FBC capturado e salvo no ViewContent:', fbc);
-    }
-  }
-  
-  // Se ainda não tiver FBC, tentar obter do cookie novamente
-  if (!fbc && typeof window !== 'undefined') {
-    const fbcCookie = document.cookie.match(new RegExp('(^| )_fbc=([^;]+)'));
-    if (fbcCookie) {
-      fbc = fbcCookie[2];
-      console.log('🎯 FBC obtido do cookie no ViewContent:', fbc);
-    }
-  }
+  // Forçar o FBC garantido nos parâmetros
+  trackingParams.fbc = fbc;
   
   // Log do status do FBC para depuração
   console.log('📊 Status FBC no ViewContent:', fbc ? '✅ Presente' : '❌ Ausente');
@@ -249,7 +229,7 @@ const trackViewContent = async (viewContentHasBeenTracked) => {
     console.log('📍 Dados de localização (ALTA QUALIDADE):', locationData);
     console.log('📊 Dados formatados (META padrão):', metaFormattedData);
     console.log('✅ Formato consistente com InitiateCheckout');
-    console.log('🎯 FBC status:', fbc ? '✅ Capturado' : '❌ Não encontrado');
+    console.log('🎯 FBC status:', fbc ? '✅ Garantido com retry' : '❌ Não encontrado mesmo com retry');
   }
   
   viewContentHasBeenTracked.current = true; // Ativa a trava.
@@ -463,10 +443,10 @@ export default function AdvancedTracking() {
       console.log('📊 Todos os eventos (PageView, ViewContent, InitiateCheckout) usam apenas GTM');
       console.log('🔗 Event ID padrão sincronizado entre todos os eventos');
       console.log('🌍 Dados geográficos com ALTA QUALIDADE (formulário > cache > API)');
-      console.log('🎯 FBC: Sincronizado e garantido para todos os eventos');
+      console.log('🎯 FBC: Garantido com retry inteligente para todos os eventos');
       console.log('🔄 Sistema de retry automático para qualidade de dados');
       console.log('📈 Validação detalhada de qualidade com feedback em tempo real');
-      console.log('🚀 Expectativa: Scores de qualidade EXCELENTES (8.0+) para todos os eventos!');
+      console.log('🚀 Expectativa: FBC 100% em todos os eventos (PageView, ViewContent, InitiateCheckout)!');
     }
     
     // Dispara o view_content após o tempo configurado, mas apenas se a trava permitir.

@@ -455,6 +455,75 @@ export function validateDataQuality(data: any): {
 }
 
 /**
+ * Função para garantir que o FBC esteja disponível antes de enviar eventos
+ * Utiliza retry inteligente com timeout para garantir processamento do cookie
+ * @returns Promise com o FBC ou null se não disponível após tentativas
+ */
+export async function waitForFBCReady(maxRetries = 10, retryDelay = 200): Promise<string | null> {
+  if (typeof window === 'undefined') return null;
+  
+  console.log('🎯 Iniciando garantia de FBC com retry inteligente...');
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    // Tentativa 1: Verificar cookie existente
+    let fbc = getCookie('_fbc');
+    
+    if (fbc) {
+      console.log(`✅ FBC encontrado na tentativa ${attempt}:`, fbc);
+      return fbc;
+    }
+    
+    // Tentativa 2: Capturar fbclid da URL e criar cookie
+    if (!fbc) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const fbclid = urlParams.get('fbclid');
+      
+      if (fbclid) {
+        const timestamp = Date.now();
+        fbc = `fb.1.${timestamp}.${fbclid}`;
+        
+        // Salvar no cookie imediatamente
+        const expirationDate = new Date();
+        expirationDate.setDate(expirationDate.getDate() + 90);
+        document.cookie = `_fbc=${fbc}; expires=${expirationDate.toUTCString()}; path=/; domain=${window.location.hostname}; SameSite=Lax`;
+        
+        console.log(`✅ FBC criado na tentativa ${attempt}:`, fbc);
+        
+        // Pequeno delay para garantir que o cookie foi salvo
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        // Verificar se o cookie foi salvo corretamente
+        const verifyFbc = getCookie('_fbc');
+        if (verifyFbc === fbc) {
+          return fbc;
+        }
+      }
+    }
+    
+    // Tentativa 3: Verificar novamente o cookie (caso tenha sido criado por outro processo)
+    if (!fbc) {
+      fbc = getCookie('_fbc');
+      if (fbc) {
+        console.log(`✅ FBC encontrado na verificação adicional (tentativa ${attempt}):`, fbc);
+        return fbc;
+      }
+    }
+    
+    // Se não encontrou e ainda temos tentativas, esperar antes da próxima
+    if (attempt < maxRetries) {
+      console.log(`⏳ FBC não encontrado na tentativa ${attempt}/${maxRetries}, aguardando ${retryDelay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
+      
+      // Aumentar o delay exponencialmente para tentativas subsequentes
+      retryDelay = Math.min(retryDelay * 1.5, 1000); // Máximo de 1 segundo entre tentativas
+    }
+  }
+  
+  console.warn(`❌ FBC não encontrado após ${maxRetries} tentativas`);
+  return null;
+}
+
+/**
  * Obtém todos os parâmetros de rastreamento necessários
  * @returns Objeto completo com todos os dados de rastreamento
  */
