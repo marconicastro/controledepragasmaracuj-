@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { getAllTrackingParams, initializeTracking, waitForFBCReady } from '@/lib/cookies';
+import { getAllTrackingParams, initializeTracking } from '@/lib/cookies';
 
 declare global {
   interface Window {
@@ -32,21 +32,51 @@ export default function GoogleTagManager({ gtmId = 'GTM-567XZCDX' }: GoogleTagMa
       window.gtag('js', new Date());
       window.gtag('config', gtmId);
 
-      // Enviar evento page_view APÓS garantir FBC (sincronizado)
+      // Enviar evento page_view APÓS capturar FBC (sincronizado)
       const sendPageView = async () => {
-        console.log('🎯 Iniciando envio de PageView com garantia de FBC...');
-        
-        // 1. Inicializar tracking primeiro
+        // 1. Capturar FBC PRIMEIRO (crítico para qualidade)
         await initializeTracking();
         
-        // 2. GARANTIR FBC com retry inteligente (CRÍTICO)
-        const fbc = await waitForFBCReady();
+        // 2. Pequeno delay para garantir processamento do cookie FBC (AJUSTE PONTUAL)
+        await new Promise(resolve => setTimeout(resolve, 100));
         
         // 3. Obter todos os parâmetros de rastreamento com FBC garantido
         const trackingParams = await getAllTrackingParams();
         
-        // Forçar o FBC garantido nos parâmetros
-        trackingParams.fbc = fbc;
+        // 4. Garantir captura do FBC - TENTATIVA AGRESSIVA
+        let fbc = trackingParams.fbc;
+        
+        // Se não tiver FBC, tentar capturar da URL novamente
+        if (!fbc && typeof window !== 'undefined') {
+          const urlParams = new URLSearchParams(window.location.search);
+          const fbclid = urlParams.get('fbclid');
+          
+          if (fbclid) {
+            // Criar FBC no formato correto
+            const timestamp = Date.now();
+            fbc = `fb.1.${timestamp}.${fbclid}`;
+            
+            // Salvar no cookie para futuros eventos
+            const expirationDate = new Date();
+            expirationDate.setDate(expirationDate.getDate() + 90);
+            document.cookie = `_fbc=${fbc}; expires=${expirationDate.toUTCString()}; path=/; domain=${window.location.hostname}; SameSite=Lax`;
+            
+            console.log('🎯 FBC capturado e salvo no PageView:', fbc);
+            
+            // Atualizar trackingParams com o FBC capturado
+            trackingParams.fbc = fbc;
+          }
+        }
+        
+        // Se ainda não tiver FBC, tentar obter do cookie novamente
+        if (!fbc && typeof window !== 'undefined') {
+          const fbcCookie = document.cookie.match(new RegExp('(^| )_fbc=([^;]+)'));
+          if (fbcCookie) {
+            fbc = fbcCookie[2];
+            trackingParams.fbc = fbc;
+            console.log('🎯 FBC obtido do cookie no PageView:', fbc);
+          }
+        }
         
         // Log do status do FBC para depuração
         console.log('📊 Status FBC no PageView:', fbc ? '✅ Presente' : '❌ Ausente');
@@ -54,10 +84,10 @@ export default function GoogleTagManager({ gtmId = 'GTM-567XZCDX' }: GoogleTagMa
           console.log('🔑 FBC value:', fbc);
         }
         
-        // 4. Gerar event_id consistente para correlação
+        // 5. Gerar event_id consistente para correlação
         const eventId = Date.now().toString(36) + Math.random().toString(36).substr(2);
         
-        // 5. Enviar PageView com FBC garantido
+        // 6. Enviar PageView com FBC garantido
         window.gtag('event', 'page_view', {
           page_title: document.title,
           page_location: window.location.href,
@@ -69,7 +99,7 @@ export default function GoogleTagManager({ gtmId = 'GTM-567XZCDX' }: GoogleTagMa
         
         console.log('📍 PageView enviado COM FBC:', fbc ? '✅ ' + fbc : '❌ Não encontrado');
         console.log('📊 Dados completos:', trackingParams);
-        console.log('🎯 FBC status no PageView:', fbc ? '✅ Garantido com retry' : '❌ Não encontrado mesmo com retry');
+        console.log('🎯 FBC status no PageView:', fbc ? '✅ Capturado' : '❌ Não encontrado');
       };
 
       // Enviar PageView de forma sincronizada (aguarda FBC)
