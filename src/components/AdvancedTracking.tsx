@@ -18,6 +18,62 @@ const cleanUserData = (userData: any) => {
   return cleaned;
 };
 
+// Função para limpar eventos processados antigos (mais de 24 horas)
+const cleanupOldEvents = (): void => {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    const processedEvents = JSON.parse(localStorage.getItem('fb_processed_events') || '[]');
+    const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
+    
+    // Remover eventos mais antigos que 24 horas
+    const recentEvents = processedEvents.filter((eventId: string) => {
+      // Extrair timestamp do event_id (formato: timestamp + random)
+      const timestamp = parseInt(eventId.split('.')[0], 36);
+      return timestamp > twentyFourHoursAgo;
+    });
+    
+    if (recentEvents.length !== processedEvents.length) {
+      localStorage.setItem('fb_processed_events', JSON.stringify(recentEvents));
+      console.log(`🧹 Limpos ${processedEvents.length - recentEvents.length} eventos antigos`);
+    }
+  } catch (error) {
+    console.error('❌ Erro ao limpar eventos antigos:', error);
+  }
+};
+
+// Função para verificar se um evento já foi processado
+const isEventProcessed = (eventId: string): boolean => {
+  if (typeof window === 'undefined') return false;
+  
+  try {
+    const processedEvents = JSON.parse(localStorage.getItem('fb_processed_events') || '[]');
+    return processedEvents.includes(eventId);
+  } catch (error) {
+    console.error('❌ Erro ao verificar eventos processados:', error);
+    return false;
+  }
+};
+
+// Função para marcar um evento como processado
+const markEventAsProcessed = (eventId: string): void => {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    const processedEvents = JSON.parse(localStorage.getItem('fb_processed_events') || '[]');
+    if (!processedEvents.includes(eventId)) {
+      processedEvents.push(eventId);
+      // Manter apenas os últimos 100 eventos para evitar crescimento excessivo
+      if (processedEvents.length > 100) {
+        processedEvents.splice(0, processedEvents.length - 100);
+      }
+      localStorage.setItem('fb_processed_events', JSON.stringify(processedEvents));
+    }
+  } catch (error) {
+    console.error('❌ Erro ao marcar evento como processado:', error);
+  }
+};
+
 // Função para gerar event_id único para desduplicação
 const generateEventId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
@@ -158,8 +214,17 @@ const trackViewContent = async (viewContentHasBeenTracked) => {
     return; // Se já foi disparado, não faz nada.
   }
 
+  // Limpar eventos antigos antes de processar
+  cleanupOldEvents();
+  
   // Gerar event_id único para desduplicação
   const eventId = generateEventId();
+  
+  // Verificar se este evento já foi processado (evita duplicação entre recarregamentos de página)
+  if (isEventProcessed(eventId)) {
+    console.log('⚠️ ViewContent evento já processado anteriormente, pulando...');
+    return;
+  }
   
   // 1. Inicializar tracking primeiro
   await initializeTracking();
@@ -225,29 +290,109 @@ const trackViewContent = async (viewContentHasBeenTracked) => {
     country: locationData.country
   });
   
-  // Enviar via DataLayer (GTM) com formato padronizado e retry
-  const eventData = {
-    event: 'view_content',
-    event_id: eventId, // Adicionar event_id para desduplicação
-    custom_data: {
-      currency: 'BRL',
-      value: 39.90,
-      content_name: 'Sistema de Controle de Trips - Maracujá',
-      content_category: 'E-book',
-      content_ids: ['6080425'], // ✅ ARRAY CORRETO
-      num_items: '1',
-      contents: [{ // ✅ ARRAY CORRETO
-        id: '6080425',
-        quantity: 1,
-        item_price: 39.90
-      }]
-    },
-    // ✅ Usar formato META padronizado (igual ao InitiateCheckout)
-    user_data: metaFormattedData
-  };
+  // ESTRATÉGIA DE ENVIO ÚNICO: Priorizar Server-side com fallback para Client-side
+  let serverSideSuccess = false;
   
-  // Enviar com sistema de retry e validação de qualidade
-  await sendEventWithRetry('view_content', eventData);
+  // 1. TENTAR ENVIAR PARA SERVER-SIDE PRIMEIRO (prioridade máxima)
+  if (typeof window !== 'undefined') {
+    try {
+      console.log('🚀 Tentando enviar view_content para server-side (prioridade máxima)...');
+      
+      // Preparar dados no formato EXATO que o Facebook Pixel espera no server-side
+      const serverSideData = {
+        event_name: 'ViewContent', // Nome do evento padrão do Facebook
+        event_id: eventId,
+        pixel_id: '714277868320104', // ID do Pixel do Facebook
+        user_data: {
+          // Dados do usuário no formato que o Facebook Pixel reconhece
+          em: metaFormattedData.em,
+          ph: metaFormattedData.ph,
+          fn: metaFormattedData.fn,
+          ln: metaFormattedData.ln,
+          ct: metaFormattedData.ct,
+          st: metaFormattedData.st,
+          zp: metaFormattedData.zp,
+          country: metaFormattedData.country,
+          client_ip_address: '', // Será preenchido pelo server-side
+          client_user_agent: navigator.userAgent,
+          fbc: metaFormattedData.fbc,
+          fbp: metaFormattedData.fbp,
+          external_id: metaFormattedData.external_id
+        },
+        custom_data: {
+          currency: 'BRL',
+          value: 39.90,
+          content_name: 'Sistema de Controle de Trips - Maracujá',
+          content_category: 'E-book',
+          content_ids: ['6080425'], // ✅ ARRAY CORRETO
+          num_items: '1',
+          contents: [{ // ✅ ARRAY CORRETO
+            id: '6080425',
+            quantity: 1,
+            item_price: 39.90
+          }]
+        }
+      };
+      
+      console.log('🚀 Dados view_content para server-side:', JSON.stringify(serverSideData, null, 2));
+      
+      // Enviar dados para o nosso server-side API
+      const response = await fetch('/api/facebook-pixel', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(serverSideData)
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ ViewContent server-side enviado com sucesso!', result);
+        serverSideSuccess = true;
+        
+        // Armazenar o event_id para evitar duplicação futura
+        markEventAsProcessed(eventId);
+      } else {
+        console.error('❌ Falha no ViewContent server-side:', response.status, response.statusText);
+        serverSideSuccess = false;
+      }
+      
+    } catch (error) {
+      console.error('❌ Erro ao enviar ViewContent para server-side:', error);
+      serverSideSuccess = false;
+    }
+  }
+
+  // 2. ENVIAR PARA CLIENT-SIDE APENAS SE SERVER-SIDE FALHOU (fallback)
+  if (!serverSideSuccess) {
+    console.log('🔄 ViewContent server-side falhou, usando fallback para client-side...');
+    
+    const eventData = {
+      event: 'view_content',
+      event_id: eventId, // Mesmo event_id para rastreamento
+      custom_data: {
+        currency: 'BRL',
+        value: 39.90,
+        content_name: 'Sistema de Controle de Trips - Maracujá',
+        content_category: 'E-book',
+        content_ids: ['6080425'], // ✅ ARRAY CORRETO
+        num_items: '1',
+        contents: [{ // ✅ ARRAY CORRETO
+          id: '6080425',
+          quantity: 1,
+          item_price: 39.90
+        }]
+      },
+      user_data: metaFormattedData
+    };
+    
+    // Enviar com sistema de retry e validação de qualidade
+    await sendEventWithRetry('view_content', eventData);
+    
+    console.log('✅ ViewContent fallback client-side enviado com sucesso!');
+  } else {
+    console.log('✅ ViewContent enviado via server-side - pulando client-side para evitar duplicação');
+  }
   
   if (META_CONFIG.TRACKING.enableDebugLogs) {
     console.log('🎯 DataLayer Push: view_content (formato padronizado via GTM)');
@@ -266,8 +411,17 @@ const trackViewContent = async (viewContentHasBeenTracked) => {
  * @param {object} userData - Os dados capturados do formulário de pré-checkout.
  */
 const trackCheckout = async (userData) => {
+  // Limpar eventos antigos antes de processar
+  cleanupOldEvents();
+  
   // Gerar event_id único e consistente com o mesmo padrão dos outros eventos
-  const eventId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+  const eventId = generateEventId();
+  
+  // Verificar se este evento já foi processado (evita duplicação entre recarregamentos de página)
+  if (isEventProcessed(eventId)) {
+    console.log('⚠️ InitiateCheckout evento já processado anteriormente, pulando...');
+    return;
+  }
   
   // Obter dados de localização de ALTA QUALIDADE (prioridade formulário > cache > API)
   const locationData = await getHighQualityLocationData();
@@ -313,10 +467,13 @@ const trackCheckout = async (userData) => {
   console.log('   - External ID:', userData.external_id);
   console.log('✅ Dados finais após limpeza:', metaFormattedData);
   
-  // ENVIAR DADOS DIRETAMENTE PARA O SERVER-SIDE (Stape) PRIMEIRO - VERSÃO OTIMIZADA PARA FACEBOOK PIXEL
+  // ESTRATÉGIA DE ENVIO ÚNICO: Priorizar Server-side com fallback para Client-side
+  let serverSideSuccess = false;
+  
+  // 1. TENTAR ENVIAR PARA SERVER-SIDE PRIMEIRO (prioridade máxima)
   if (typeof window !== 'undefined') {
     try {
-      console.log('🚀 Enviando dados para o server-side PRIMEIRO...');
+      console.log('🚀 Tentando enviar para server-side (prioridade máxima)...');
       
       // Preparar dados no formato EXATO que o Facebook Pixel espera no server-side
       const serverSideData = {
@@ -358,9 +515,9 @@ const trackCheckout = async (userData) => {
         }
       };
       
-      console.log('🚀 Enviando para server-side com formato:', JSON.stringify(serverSideData, null, 2));
+      console.log('🚀 Dados para server-side:', JSON.stringify(serverSideData, null, 2));
       
-      // Enviar dados para o nosso server-side API que formata corretamente para Facebook
+      // Enviar dados para o nosso server-side API
       const response = await fetch('/api/facebook-pixel', {
         method: 'POST',
         headers: {
@@ -369,61 +526,58 @@ const trackCheckout = async (userData) => {
         body: JSON.stringify(serverSideData)
       });
       
-      console.log('✅ Resposta do server-side:', response.status, response.statusText);
-      
       if (response.ok) {
         const result = await response.json();
-        console.log('✅ Dados enviados para o server-side com sucesso!', result);
+        console.log('✅ Server-side enviado com sucesso!', result);
+        serverSideSuccess = true;
+        
+        // Armazenar o event_id para evitar duplicação futura
+        markEventAsProcessed(eventId);
       } else {
-        console.error('❌ Erro na resposta do server-side:', response.status, response.statusText);
+        console.error('❌ Falha no server-side:', response.status, response.statusText);
+        serverSideSuccess = false;
       }
       
-      console.log('📊 Dados enviados para Facebook Pixel:', {
-        em: metaFormattedData.em,
-        ph: metaFormattedData.ph,
-        fn: metaFormattedData.fn,
-        ln: metaFormattedData.ln,
-        ct: metaFormattedData.ct,
-        st: metaFormattedData.st,
-        zp: metaFormattedData.zp,
-        country: metaFormattedData.country
-      });
-      
     } catch (error) {
-      console.error('❌ Erro ao enviar dados para o server-side:', error);
+      console.error('❌ Erro ao enviar para server-side:', error);
+      serverSideSuccess = false;
     }
   }
 
-  // ENVIAR VIA DATALAYER (GTM) DEPOIS - com formato META para Facebook e sistema de retry
-  const eventData = {
-    event: 'initiate_checkout',
-    event_id: eventId, // Mesmo padrão de Event ID
-    custom_data: {
-      currency: 'BRL',
-      value: 39.90,
-      content_name: 'E-book Sistema de Controle de Trips - Maracujá',
-      content_category: 'E-book',
-      content_ids: ['ebook-controle-trips'], // ✅ ARRAY CORRETO
-      num_items: '1',
-      items: [{ // ✅ ARRAY CORRETO
-        item_id: 'ebook-controle-trips',
-        item_name: 'E-book Sistema de Controle de Trips',
-        quantity: 1,
-        price: 39.90,
-        item_category: 'E-book',
-        item_brand: 'Maracujá Zero Pragas',
-        currency: 'BRL'
-      }]
-    },
-    // ✅ Usar formato META que o Facebook reconhece
-    user_data: metaFormattedData
-  };
-  
-  // Pequeno atraso para garantir que server-side seja processado primeiro
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  // Enviar com sistema de retry e validação de qualidade
-  await sendEventWithRetry('initiate_checkout', eventData);
+  // 2. ENVIAR PARA CLIENT-SIDE APENAS SE SERVER-SIDE FALHOU (fallback)
+  if (!serverSideSuccess) {
+    console.log('🔄 Server-side falhou, usando fallback para client-side...');
+    
+    const eventData = {
+      event: 'initiate_checkout',
+      event_id: eventId, // Mesmo event_id para rastreamento
+      custom_data: {
+        currency: 'BRL',
+        value: 39.90,
+        content_name: 'E-book Sistema de Controle de Trips - Maracujá',
+        content_category: 'E-book',
+        content_ids: ['ebook-controle-trips'], // ✅ ARRAY CORRETO
+        num_items: '1',
+        items: [{ // ✅ ARRAY CORRETO
+          item_id: 'ebook-controle-trips',
+          item_name: 'E-book Sistema de Controle de Trips',
+          quantity: 1,
+          price: 39.90,
+          item_category: 'E-book',
+          item_brand: 'Maracujá Zero Pragas',
+          currency: 'BRL'
+        }]
+      },
+      user_data: metaFormattedData
+    };
+    
+    // Enviar com sistema de retry e validação de qualidade
+    await sendEventWithRetry('initiate_checkout', eventData);
+    
+    console.log('✅ Fallback client-side enviado com sucesso!');
+  } else {
+    console.log('✅ Evento enviado via server-side - pulando client-side para evitar duplicação');
+  }
 
   if (META_CONFIG.TRACKING.enableDebugLogs) {
     console.log('🛒 Initiate Checkout: Enviado com formato OTIMIZADO para Facebook Pixel!');
