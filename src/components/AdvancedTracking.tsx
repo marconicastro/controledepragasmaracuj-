@@ -322,7 +322,7 @@ const trackCheckout = async (userData) => {
       const serverSideData = {
         event_name: 'InitiateCheckout', // Nome do evento padrão do Facebook
         event_id: eventId,
-        pixel_id: '642933108377475', // ID do Pixel do Facebook
+        pixel_id: '714277868320104', // ID do Pixel do Facebook
         user_data: {
           // Dados do usuário no formato que o Facebook Pixel reconhece
           em: metaFormattedData.em,

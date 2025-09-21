@@ -16,7 +16,7 @@ export default function TestFacebookPixel() {
       const testData = {
         event_name: 'InitiateCheckout',
         event_id: 'test-' + Date.now(),
-        pixel_id: '642933108377475',
+        pixel_id: '714277868320104',
         user_data: {
           em: 'test@example.com',
           ph: '11999999999',
