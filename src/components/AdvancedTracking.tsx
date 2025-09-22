@@ -418,6 +418,16 @@ const trackViewContent = async (viewContentHasBeenTracked) => {
         
         if (serverSideConfirmed) {
           console.log('✅ Server-side confirmado pelo Facebook - pulando client-side para evitar duplicação');
+          
+          // Marcar eventos server-side como enviados para liberar GTM
+          if (typeof window !== 'undefined' && window.markServerSideEventsSent) {
+            window.markServerSideEventsSent();
+          }
+          
+          // Liberar eventos bloqueados do Facebook Pixel
+          if (typeof window !== 'undefined' && window._releaseBlockedEvents) {
+            window._releaseBlockedEvents();
+          }
         } else {
           console.log('⚠️ Server-side não confirmado - client-side será enviado como backup');
         }
@@ -468,6 +478,15 @@ const trackViewContent = async (viewContentHasBeenTracked) => {
     await sendEventWithRetry('view_content', eventData);
     
     console.log('✅ ViewContent fallback client-side enviado com sucesso!');
+    
+    // Mesmo no fallback, liberar eventos bloqueados
+    if (typeof window !== 'undefined' && window.markServerSideEventsSent) {
+      window.markServerSideEventsSent();
+    }
+    
+    if (typeof window !== 'undefined' && window._releaseBlockedEvents) {
+      window._releaseBlockedEvents();
+    }
   } else {
     console.log('✅ ViewContent enviado e confirmado via server-side - client-side pulado para evitar duplicação');
   }
@@ -800,6 +819,16 @@ const trackCheckout = async (userData) => {
         
         if (serverSideConfirmed) {
           console.log('✅ Server-side confirmado pelo Facebook - pulando client-side para evitar duplicação');
+          
+          // Marcar eventos server-side como enviados para liberar GTM
+          if (typeof window !== 'undefined' && window.markServerSideEventsSent) {
+            window.markServerSideEventsSent();
+          }
+          
+          // Liberar eventos bloqueados do Facebook Pixel
+          if (typeof window !== 'undefined' && window._releaseBlockedEvents) {
+            window._releaseBlockedEvents();
+          }
         } else {
           console.log('⚠️ Server-side não confirmado - client-side será enviado como backup');
         }
@@ -854,6 +883,15 @@ const trackCheckout = async (userData) => {
     await sendEventWithRetry('initiate_checkout', eventData);
     
     console.log('✅ InitiateCheckout fallback client-side enviado com sucesso!');
+    
+    // Mesmo no fallback, liberar eventos bloqueados
+    if (typeof window !== 'undefined' && window.markServerSideEventsSent) {
+      window.markServerSideEventsSent();
+    }
+    
+    if (typeof window !== 'undefined' && window._releaseBlockedEvents) {
+      window._releaseBlockedEvents();
+    }
   } else {
     console.log('✅ InitiateCheckout enviado e confirmado via server-side - client-side pulado para evitar duplicação');
   }
