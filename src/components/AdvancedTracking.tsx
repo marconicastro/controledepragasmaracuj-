@@ -120,6 +120,54 @@ const getImprovedTrackingData = async () => {
   };
 };
 
+// Função para esperar confirmação de processamento do evento
+const waitForServerSideConfirmation = async (eventId: string, timeout: number = 5000): Promise<boolean> => {
+  if (typeof window === 'undefined') return false;
+  
+  return new Promise((resolve) => {
+    const startTime = Date.now();
+    
+    const checkConfirmation = () => {
+      const processedEvents = JSON.parse(localStorage.getItem('fb_server_confirmed_events') || '[]');
+      
+      if (processedEvents.includes(eventId)) {
+        console.log(`✅ Evento ${eventId} confirmado pelo server-side`);
+        resolve(true);
+        return;
+      }
+      
+      if (Date.now() - startTime > timeout) {
+        console.log(`⏰ Timeout aguardando confirmação do evento ${eventId}`);
+        resolve(false);
+        return;
+      }
+      
+      setTimeout(checkConfirmation, 100); // Verificar a cada 100ms
+    };
+    
+    checkConfirmation();
+  });
+};
+
+// Função para marcar evento como confirmado pelo server-side
+const markServerSideConfirmed = (eventId: string): void => {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    const confirmedEvents = JSON.parse(localStorage.getItem('fb_server_confirmed_events') || '[]');
+    if (!confirmedEvents.includes(eventId)) {
+      confirmedEvents.push(eventId);
+      // Manter apenas os últimos 50 eventos confirmados
+      if (confirmedEvents.length > 50) {
+        confirmedEvents.splice(0, confirmedEvents.length - 50);
+      }
+      localStorage.setItem('fb_server_confirmed_events', JSON.stringify(confirmedEvents));
+    }
+  } catch (error) {
+    console.error('❌ Erro ao marcar evento como confirmado:', error);
+  }
+};
+
 // Função para enviar eventos com retry e validação de qualidade
 const sendEventWithRetry = async (eventName: string, eventData: any, maxRetries = 3) => {
   let retries = 0;
@@ -290,8 +338,9 @@ const trackViewContent = async (viewContentHasBeenTracked) => {
     country: locationData.country
   });
   
-  // ESTRATÉGIA DE ENVIO ÚNICO: Priorizar Server-side com fallback para Client-side
+  // ESTRATÉGIA DE ENVIO GARANTIDO: Server-side PRIMEIRO com confirmação
   let serverSideSuccess = false;
+  let serverSideConfirmed = false;
   
   // 1. TENTAR ENVIAR PARA SERVER-SIDE PRIMEIRO (prioridade máxima)
   if (typeof window !== 'undefined') {
@@ -350,8 +399,29 @@ const trackViewContent = async (viewContentHasBeenTracked) => {
         console.log('✅ ViewContent server-side enviado com sucesso!', result);
         serverSideSuccess = true;
         
-        // Armazenar o event_id para evitar duplicação futura
+        // Marcar o evento como enviado para evitar duplicação futura
         markEventAsProcessed(eventId);
+        
+        // Executar script de confirmação se estiver disponível
+        if (result.clientScript && typeof window !== 'undefined') {
+          try {
+            eval(result.clientScript);
+            console.log('✅ Script de confirmação executado com sucesso');
+          } catch (error) {
+            console.error('❌ Erro ao executar script de confirmação:', error);
+          }
+        }
+        
+        // Aguardar confirmação de processamento (CRÍTICO para ordem correta)
+        console.log('⏳ Aguardando confirmação de processamento do server-side...');
+        serverSideConfirmed = await waitForServerSideConfirmation(eventId, 3000); // 3 segundos de timeout
+        
+        if (serverSideConfirmed) {
+          console.log('✅ Server-side confirmado pelo Facebook - pulando client-side para evitar duplicação');
+        } else {
+          console.log('⚠️ Server-side não confirmado - client-side será enviado como backup');
+        }
+        
       } else {
         console.error('❌ Falha no ViewContent server-side:', response.status, response.statusText);
         serverSideSuccess = false;
@@ -363,9 +433,17 @@ const trackViewContent = async (viewContentHasBeenTracked) => {
     }
   }
 
-  // 2. ENVIAR PARA CLIENT-SIDE APENAS SE SERVER-SIDE FALHOU (fallback)
-  if (!serverSideSuccess) {
-    console.log('🔄 ViewContent server-side falhou, usando fallback para client-side...');
+  // 2. ENVIAR PARA CLIENT-SIDE APENAS SE SERVER-SIDE FALHOU OU NÃO FOI CONFIRMADO
+  if (!serverSideSuccess || !serverSideConfirmed) {
+    if (!serverSideSuccess) {
+      console.log('🔄 ViewContent server-side falhou, usando fallback para client-side...');
+    } else {
+      console.log('🔄 ViewContent server-side não confirmado, enviando client-side como backup...');
+    }
+    
+    // Delay estratégico para garantir que o server-side tenha tempo de ser processado
+    console.log('⏳ Aguardando 2 segundos antes de enviar client-side (garantir ordem correta)...');
+    await new Promise(resolve => setTimeout(resolve, 2000));
     
     const eventData = {
       event: 'view_content',
@@ -391,7 +469,7 @@ const trackViewContent = async (viewContentHasBeenTracked) => {
     
     console.log('✅ ViewContent fallback client-side enviado com sucesso!');
   } else {
-    console.log('✅ ViewContent enviado via server-side - pulando client-side para evitar duplicação');
+    console.log('✅ ViewContent enviado e confirmado via server-side - client-side pulado para evitar duplicação');
   }
   
   if (META_CONFIG.TRACKING.enableDebugLogs) {
@@ -638,13 +716,14 @@ const trackCheckout = async (userData) => {
   console.log('   - External ID:', userData.external_id);
   console.log('✅ Dados finais após limpeza:', metaFormattedData);
   
-  // ESTRATÉGIA DE ENVIO ÚNICO: Priorizar Server-side com fallback para Client-side
+  // ESTRATÉGIA DE ENVIO GARANTIDO: Server-side PRIMEIRO com confirmação
   let serverSideSuccess = false;
+  let serverSideConfirmed = false;
   
   // 1. TENTAR ENVIAR PARA SERVER-SIDE PRIMEIRO (prioridade máxima)
   if (typeof window !== 'undefined') {
     try {
-      console.log('🚀 Tentando enviar para server-side (prioridade máxima)...');
+      console.log('🚀 Tentando enviar InitiateCheckout para server-side (prioridade máxima)...');
       
       // Preparar dados no formato EXATO que o Facebook Pixel espera no server-side
       const serverSideData = {
@@ -686,7 +765,7 @@ const trackCheckout = async (userData) => {
         }
       };
       
-      console.log('🚀 Dados para server-side:', JSON.stringify(serverSideData, null, 2));
+      console.log('🚀 Dados InitiateCheckout para server-side:', JSON.stringify(serverSideData, null, 2));
       
       // Enviar dados para o nosso server-side API
       const response = await fetch('/api/facebook-pixel', {
@@ -699,25 +778,54 @@ const trackCheckout = async (userData) => {
       
       if (response.ok) {
         const result = await response.json();
-        console.log('✅ Server-side enviado com sucesso!', result);
+        console.log('✅ InitiateCheckout server-side enviado com sucesso!', result);
         serverSideSuccess = true;
         
-        // Armazenar o event_id para evitar duplicação futura
+        // Marcar o evento como enviado para evitar duplicação futura
         markEventAsProcessed(eventId);
+        
+        // Executar script de confirmação se estiver disponível
+        if (result.clientScript && typeof window !== 'undefined') {
+          try {
+            eval(result.clientScript);
+            console.log('✅ Script de confirmação executado com sucesso');
+          } catch (error) {
+            console.error('❌ Erro ao executar script de confirmação:', error);
+          }
+        }
+        
+        // Aguardar confirmação de processamento (CRÍTICO para ordem correta)
+        console.log('⏳ Aguardando confirmação de processamento do server-side...');
+        serverSideConfirmed = await waitForServerSideConfirmation(eventId, 3000); // 3 segundos de timeout
+        
+        if (serverSideConfirmed) {
+          console.log('✅ Server-side confirmado pelo Facebook - pulando client-side para evitar duplicação');
+        } else {
+          console.log('⚠️ Server-side não confirmado - client-side será enviado como backup');
+        }
+        
       } else {
-        console.error('❌ Falha no server-side:', response.status, response.statusText);
+        console.error('❌ Falha no InitiateCheckout server-side:', response.status, response.statusText);
         serverSideSuccess = false;
       }
       
     } catch (error) {
-      console.error('❌ Erro ao enviar para server-side:', error);
+      console.error('❌ Erro ao enviar InitiateCheckout para server-side:', error);
       serverSideSuccess = false;
     }
   }
 
-  // 2. ENVIAR PARA CLIENT-SIDE APENAS SE SERVER-SIDE FALHOU (fallback)
-  if (!serverSideSuccess) {
-    console.log('🔄 Server-side falhou, usando fallback para client-side...');
+  // 2. ENVIAR PARA CLIENT-SIDE APENAS SE SERVER-SIDE FALHOU OU NÃO FOI CONFIRMADO
+  if (!serverSideSuccess || !serverSideConfirmed) {
+    if (!serverSideSuccess) {
+      console.log('🔄 InitiateCheckout server-side falhou, usando fallback para client-side...');
+    } else {
+      console.log('🔄 InitiateCheckout server-side não confirmado, enviando client-side como backup...');
+    }
+    
+    // Delay estratégico para garantir que o server-side tenha tempo de ser processado
+    console.log('⏳ Aguardando 2 segundos antes de enviar client-side (garantir ordem correta)...');
+    await new Promise(resolve => setTimeout(resolve, 2000));
     
     const eventData = {
       event: 'initiate_checkout',
@@ -745,9 +853,9 @@ const trackCheckout = async (userData) => {
     // Enviar com sistema de retry e validação de qualidade
     await sendEventWithRetry('initiate_checkout', eventData);
     
-    console.log('✅ Fallback client-side enviado com sucesso!');
+    console.log('✅ InitiateCheckout fallback client-side enviado com sucesso!');
   } else {
-    console.log('✅ Evento enviado via server-side - pulando client-side para evitar duplicação');
+    console.log('✅ InitiateCheckout enviado e confirmado via server-side - client-side pulado para evitar duplicação');
   }
 
   if (META_CONFIG.TRACKING.enableDebugLogs) {

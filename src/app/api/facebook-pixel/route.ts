@@ -258,6 +258,26 @@ export async function POST(request: NextRequest) {
     if (facebookResult.success) {
       console.log(`✅ [${requestId}] Evento enviado com sucesso para Facebook em ${processingTime}ms:`, facebookResult.result);
       
+      // Enviar confirmação para o cliente (opcional - para sincronização)
+      try {
+        // Enviar confirmação de forma assíncrona (não bloquear a resposta principal)
+        fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/facebook-pixel/confirm`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            eventId: body.event_id,
+            eventName: body.event_name,
+            status: 'success'
+          })
+        }).catch(err => {
+          console.log(`⚠️ [${requestId}] Não foi possível enviar confirmação:`, err.message);
+        });
+      } catch (error) {
+        console.log(`⚠️ [${requestId}] Erro ao enviar confirmação:`, error.message);
+      }
+      
       return NextResponse.json({
         success: true,
         message: 'Evento enviado com sucesso para Facebook',
