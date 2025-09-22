@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Shield, CreditCard, User, Mail, Phone, MapPin, Building, Map } from 'lucide-react';
+import { addUTMHiddenFields } from '@/lib/cookies';
 
 // Schema de validação do formulário
 const checkoutFormSchema = z.object({
@@ -160,6 +161,20 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
     }
   }, [isOpen, reset]);
 
+  // Adicionar campos ocultos de UTM quando o modal abrir
+  React.useEffect(() => {
+    if (isOpen) {
+      // Pequeno delay para garantir que o formulário esteja no DOM
+      setTimeout(() => {
+        const form = document.querySelector('form');
+        if (form) {
+          addUTMHiddenFields(form);
+          console.log('📝 Campos UTM adicionados ao formulário do pré-checkout');
+        }
+      }, 100);
+    }
+  }, [isOpen]);
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
@@ -182,7 +197,7 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
             </Label>
             <Input
               id="fullName"
-              placeholder="Ex: João da Silva"
+              placeholder="Digite seu nome completo"
               {...register('fullName')}
               className={errors.fullName ? 'border-red-500' : ''}
             />
@@ -217,7 +232,7 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
             </Label>
             <Input
               id="phone"
-              placeholder="(11) 99999-9999"
+              placeholder="(77) 99827-606"
               {...register('phone')}
               onChange={handlePhoneChange}
               maxLength={15}
@@ -257,7 +272,7 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
               </Label>
               <Input
                 id="city"
-                placeholder="Ex: São Paulo"
+                placeholder="São Paulo"
                 {...register('city')}
                 className={errors.city ? 'border-red-500' : ''}
               />
@@ -273,7 +288,7 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
               </Label>
               <Input
                 id="state"
-                placeholder="Ex: SP"
+                placeholder="SP"
                 {...register('state')}
                 onChange={handleUFChange}
                 maxLength={2}
