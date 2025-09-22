@@ -129,7 +129,7 @@ async function sendEventToFacebook(eventData: any, maxRetries: number = 3): Prom
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(eventData.data)
+        body: JSON.stringify(eventData) // Enviar o objeto completo, não apenas eventData.data
       });
       
       if (!facebookResponse.ok) {
@@ -261,7 +261,8 @@ export async function POST(request: NextRequest) {
       // Enviar confirmação para o cliente (opcional - para sincronização)
       try {
         // Enviar confirmação de forma assíncrona (não bloquear a resposta principal)
-        fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/facebook-pixel/confirm`, {
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+        fetch(`${baseUrl}/api/facebook-pixel/confirm`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

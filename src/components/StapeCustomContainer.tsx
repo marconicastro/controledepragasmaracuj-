@@ -60,6 +60,14 @@ export default function StapeCustomContainer({ gtmId = 'GTM-567XZCDX' }: StapeCu
       window._blockedEvents = [];
     };
     
+    // Timeout de segurança global - liberar eventos após 15 segundos mesmo sem confirmação
+    const safetyTimeout = setTimeout(() => {
+      if (window._fbqBlocked) {
+        console.log('⏰ Timeout de segurança global - liberando eventos bloqueados...');
+        window._releaseBlockedEvents();
+      }
+    }, 15000); // 15 segundos
+    
     // Função gtag
     window.gtag = function gtag(...args: any[]) {
       window.dataLayer.push(args);
@@ -148,7 +156,7 @@ export default function StapeCustomContainer({ gtmId = 'GTM-567XZCDX' }: StapeCu
       }
       
       // 5. Gerar event_id consistente para correlação
-      const eventId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+      const eventId = 'pageview_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2);
       
       // 6. Enviar PageView com FBC garantido (agora com atraso estratégico)
       console.log('📍 Enviando PageView COM FBC (após server-side):', fbc ? '✅ ' + fbc : '❌ Não encontrado');

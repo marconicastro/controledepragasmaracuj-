@@ -75,8 +75,10 @@ const markEventAsProcessed = (eventId: string): void => {
 };
 
 // Função para gerar event_id único para desduplicação
-const generateEventId = () => {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2);
+const generateEventId = (eventType: string = '') => {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substr(2);
+  return `${eventType}_${timestamp}_${random}`;
 };
 
 // Função para calcular qualidade dos dados
@@ -266,7 +268,7 @@ const trackViewContent = async (viewContentHasBeenTracked) => {
   cleanupOldEvents();
   
   // Gerar event_id único para desduplicação
-  const eventId = generateEventId();
+  const eventId = generateEventId('view_content');
   
   // Verificar se este evento já foi processado (evita duplicação entre recarregamentos de página)
   if (isEventProcessed(eventId)) {
@@ -435,11 +437,31 @@ const trackViewContent = async (viewContentHasBeenTracked) => {
       } else {
         console.error('❌ Falha no ViewContent server-side:', response.status, response.statusText);
         serverSideSuccess = false;
+        
+        // Liberar eventos bloqueados mesmo em caso de falha do servidor
+        console.log('🔓 Liberando eventos bloqueados devido à falha do servidor...');
+        if (typeof window !== 'undefined' && window.markServerSideEventsSent) {
+          window.markServerSideEventsSent();
+        }
+        
+        if (typeof window !== 'undefined' && window._releaseBlockedEvents) {
+          window._releaseBlockedEvents();
+        }
       }
       
     } catch (error) {
       console.error('❌ Erro ao enviar ViewContent para server-side:', error);
       serverSideSuccess = false;
+      
+      // Liberar eventos bloqueados mesmo em caso de erro/exceção
+      console.log('🔓 Liberando eventos bloqueados devido à exceção no servidor...');
+      if (typeof window !== 'undefined' && window.markServerSideEventsSent) {
+        window.markServerSideEventsSent();
+      }
+      
+      if (typeof window !== 'undefined' && window._releaseBlockedEvents) {
+        window._releaseBlockedEvents();
+      }
     }
   }
 
@@ -512,7 +534,7 @@ const trackViewContentWithUserData = async (userData) => {
   cleanupOldEvents();
   
   // Gerar event_id único para desduplicação
-  const eventId = generateEventId();
+  const eventId = generateEventId('view_content_with_user');
   
   // Verificar se este evento já foi processado
   if (isEventProcessed(eventId)) {
@@ -683,7 +705,7 @@ const trackCheckout = async (userData) => {
   cleanupOldEvents();
   
   // Gerar event_id único e consistente com o mesmo padrão dos outros eventos
-  const eventId = generateEventId();
+  const eventId = generateEventId('initiate_checkout');
   
   // Verificar se este evento já foi processado (evita duplicação entre recarregamentos de página)
   if (isEventProcessed(eventId)) {
@@ -836,11 +858,31 @@ const trackCheckout = async (userData) => {
       } else {
         console.error('❌ Falha no InitiateCheckout server-side:', response.status, response.statusText);
         serverSideSuccess = false;
+        
+        // Liberar eventos bloqueados mesmo em caso de falha do servidor
+        console.log('🔓 Liberando eventos bloqueados devido à falha do servidor...');
+        if (typeof window !== 'undefined' && window.markServerSideEventsSent) {
+          window.markServerSideEventsSent();
+        }
+        
+        if (typeof window !== 'undefined' && window._releaseBlockedEvents) {
+          window._releaseBlockedEvents();
+        }
       }
       
     } catch (error) {
       console.error('❌ Erro ao enviar InitiateCheckout para server-side:', error);
       serverSideSuccess = false;
+      
+      // Liberar eventos bloqueados mesmo em caso de erro/exceção
+      console.log('🔓 Liberando eventos bloqueados devido à exceção no servidor...');
+      if (typeof window !== 'undefined' && window.markServerSideEventsSent) {
+        window.markServerSideEventsSent();
+      }
+      
+      if (typeof window !== 'undefined' && window._releaseBlockedEvents) {
+        window._releaseBlockedEvents();
+      }
     }
   }
 
