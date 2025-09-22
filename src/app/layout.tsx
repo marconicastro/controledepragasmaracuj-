@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
-import GoogleTagManager from "@/components/GoogleTagManager";
+import StapeTopScript from "@/components/StapeTopScript";
 import AdvancedTracking from "@/components/AdvancedTracking";
 import GTMDataLayerChecker from "@/components/GTMDataLayerChecker";
 import FacebookPixelDebugger from "@/components/FacebookPixelDebugger";
@@ -44,11 +44,20 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <GoogleTagManager />
+        <StapeTopScript />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
+        {/* Stape GTM Noscript */}
+        <noscript>
+          <iframe 
+            src="https://bfbsewli.sag.stape.io/ns.html?id=GTM-567XZCDX" 
+            height="0" 
+            width="0" 
+            style={{ display: 'none', visibility: 'hidden' }}
+          />
+        </noscript>
         <AdvancedTracking />
         <GTMDataLayerChecker />
         <FacebookPixelDebugger />
