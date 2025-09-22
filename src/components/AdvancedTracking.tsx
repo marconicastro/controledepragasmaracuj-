@@ -407,6 +407,177 @@ const trackViewContent = async (viewContentHasBeenTracked) => {
 };
 
 /**
+ * Dispara o evento 'view_content' com dados do usuário fornecidos.
+ * @param {object} userData - Dados do usuário para enriquecer o evento.
+ */
+const trackViewContentWithUserData = async (userData) => {
+  // Limpar eventos antigos antes de processar
+  cleanupOldEvents();
+  
+  // Gerar event_id único para desduplicação
+  const eventId = generateEventId();
+  
+  // Verificar se este evento já foi processado
+  if (isEventProcessed(eventId)) {
+    console.log('⚠️ ViewContent com userData já processado anteriormente, pulando...');
+    return;
+  }
+  
+  // 1. Inicializar tracking primeiro
+  await initializeTracking();
+  
+  // 2. Obter dados de localização de ALTA QUALIDADE
+  const locationData = await getHighQualityLocationData();
+  
+  // 3. Obter todos os parâmetros de rastreamento
+  const trackingParams = await getAllTrackingParams();
+  
+  // 4. Garantir captura do FBC
+  let fbc = trackingParams.fbc;
+  
+  // Se não tiver FBC, tentar capturar da URL
+  if (!fbc && typeof window !== 'undefined') {
+    const urlParams = new URLSearchParams(window.location.search);
+    const fbclid = urlParams.get('fbclid');
+    
+    if (fbclid) {
+      const timestamp = Date.now();
+      fbc = `fb.1.${timestamp}.${fbclid}`;
+      
+      const expirationDate = new Date();
+      expirationDate.setDate(expirationDate.getDate() + 90);
+      document.cookie = `_fbc=${fbc}; expires=${expirationDate.toUTCString()}; path=/; domain=${window.location.hostname}; SameSite=Lax`;
+      
+      console.log('🎯 FBC capturado e salvo no ViewContent com userData:', fbc);
+    }
+  }
+  
+  // Preparar dados no FORMATO META com dados do usuário fornecidos
+  const metaFormattedData = cleanUserData({
+    // ✅ Dados do usuário fornecidos (alta qualidade)
+    em: userData.email ? userData.email.toLowerCase().trim() : undefined,
+    ph: userData.phone ? userData.phone.replace(/\D/g, '') : undefined,
+    fn: userData.firstName ? userData.firstName.trim() : undefined,
+    ln: userData.lastName ? userData.lastName.trim() : undefined,
+    
+    // ✅ Dados geográficos
+    ct: locationData.city || userData.city,
+    st: locationData.state || userData.state,
+    zp: locationData.zip || userData.zip,
+    country: locationData.country || userData.country || 'BR',
+    
+    // ✅ Dados de rastreamento
+    fbc: fbc,
+    fbp: trackingParams.fbp,
+    ga_client_id: trackingParams.ga_client_id,
+    external_id: userData.email ? userData.email.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() : trackingParams.external_id
+  });
+  
+  // ESTRATÉGIA DE ENVIO: Server-side com fallback Client-side
+  let serverSideSuccess = false;
+  
+  // 1. TENTAR ENVIAR PARA SERVER-SIDE
+  if (typeof window !== 'undefined') {
+    try {
+      console.log('🚀 Tentando enviar view_content com userData para server-side...');
+      
+      const serverSideData = {
+        event_name: 'ViewContent',
+        event_id: eventId,
+        pixel_id: '714277868320104',
+        user_data: {
+          em: metaFormattedData.em,
+          ph: metaFormattedData.ph,
+          fn: metaFormattedData.fn,
+          ln: metaFormattedData.ln,
+          ct: metaFormattedData.ct,
+          st: metaFormattedData.st,
+          zp: metaFormattedData.zp,
+          country: metaFormattedData.country,
+          client_ip_address: '',
+          client_user_agent: navigator.userAgent,
+          fbc: metaFormattedData.fbc,
+          fbp: metaFormattedData.fbp,
+          external_id: metaFormattedData.external_id
+        },
+        custom_data: {
+          currency: 'BRL',
+          value: 39.90,
+          content_name: 'Sistema de Controle de Trips - Maracujá',
+          content_category: 'E-book',
+          content_ids: ['6080425'],
+          num_items: '1',
+          contents: [{
+            id: '6080425',
+            quantity: 1,
+            item_price: 39.90
+          }]
+        }
+      };
+      
+      const response = await fetch('/api/facebook-pixel', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(serverSideData)
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ ViewContent com userData server-side enviado com sucesso!', result);
+        serverSideSuccess = true;
+        markEventAsProcessed(eventId);
+      } else {
+        console.error('❌ Falha no ViewContent com userData server-side:', response.status);
+        serverSideSuccess = false;
+      }
+      
+    } catch (error) {
+      console.error('❌ Erro ao enviar ViewContent com userData para server-side:', error);
+      serverSideSuccess = false;
+    }
+  }
+
+  // 2. FALLBACK PARA CLIENT-SIDE
+  if (!serverSideSuccess) {
+    console.log('🔄 ViewContent com userData server-side falhou, usando fallback client-side...');
+    
+    const eventData = {
+      event: 'view_content',
+      event_id: eventId,
+      custom_data: {
+        currency: 'BRL',
+        value: 39.90,
+        content_name: 'Sistema de Controle de Trips - Maracujá',
+        content_category: 'E-book',
+        content_ids: ['6080425'],
+        num_items: '1',
+        contents: [{
+          id: '6080425',
+          quantity: 1,
+          item_price: 39.90
+        }]
+      },
+      user_data: metaFormattedData
+    };
+    
+    await sendEventWithRetry('view_content', eventData);
+    console.log('✅ ViewContent com userData fallback client-side enviado com sucesso!');
+  }
+  
+  if (META_CONFIG.TRACKING.enableDebugLogs) {
+    console.log('🎯 ViewContent com userData enviado com qualidade melhorada!');
+    console.log('📊 Dados do usuário incluídos:', {
+      email: metaFormattedData.em ? '✅' : '❌',
+      phone: metaFormattedData.ph ? '✅' : '❌',
+      firstName: metaFormattedData.fn ? '✅' : '❌',
+      lastName: metaFormattedData.ln ? '✅' : '❌'
+    });
+  }
+};
+
+/**
  * Dispara o evento 'initiate_checkout' com os dados do usuário otimizados para Meta EQM.
  * @param {object} userData - Os dados capturados do formulário de pré-checkout.
  */
@@ -638,8 +809,10 @@ export default function AdvancedTracking() {
       // Expondo as funções na janela global para serem chamadas pelo pré-checkout.
       if (typeof window !== 'undefined') {
         window.advancedTracking = {
-          // Apenas a função trackCheckout é exposta globalmente.
+          // A função trackCheckout é exposta globalmente.
           trackCheckout,
+          // A nova função para ViewContent com dados do usuário
+          trackViewContentWithUserData,
         };
       }
 
@@ -659,6 +832,7 @@ declare global {
     dataLayer?: any[];
     advancedTracking?: {
       trackCheckout: (userData: any) => Promise<void>;
+      trackViewContentWithUserData: (userData: any) => Promise<void>;
     };
   }
 }

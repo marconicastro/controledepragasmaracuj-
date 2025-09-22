@@ -11,11 +11,11 @@ declare global {
   }
 }
 
-interface GoogleTagManagerProps {
+interface StapeCustomContainerProps {
   gtmId: string;
 }
 
-export default function GoogleTagManager({ gtmId = 'GTM-567XZCDX' }: GoogleTagManagerProps) {
+export default function StapeCustomContainer({ gtmId = 'GTM-567XZCDX' }: StapeCustomContainerProps) {
   const pathname = usePathname();
 
   useEffect(() => {
@@ -109,23 +109,19 @@ export default function GoogleTagManager({ gtmId = 'GTM-567XZCDX' }: GoogleTagMa
 
   return (
     <>
-      {/* Google Tag Manager */}
+      {/* Stape.io Custom Container - Anti-AdBlock */}
       <script
         dangerouslySetInnerHTML={{
           __html: `
-            (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-            new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-            j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-            'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-            })(window,document,'script','dataLayer','${gtmId}');
+            (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s);j.async=true;j.src="https://data.maracujazeropragas.com/7aibfbsewli.js?"+i;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','2nj=AAhKIicvS1dfWy8%2FMCY%2BRB9RRUtCRAIMVAEWFxIBEwgIFhIXHBIUAw4NBEsQDQs%3D');
           `,
         }}
       />
       
-      {/* Google Tag Manager (noscript) */}
+      {/* Stape.io Custom Container (noscript) */}
       <noscript>
         <iframe
-          src={`https://www.googletagmanager.com/ns.html?id=${gtmId}`}
+          src="https://data.maracujazeropragas.com/ns.html?id=GTM-567XZCDX"
           height="0"
           width="0"
           style={{ display: 'none', visibility: 'hidden' }}

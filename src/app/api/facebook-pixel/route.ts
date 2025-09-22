@@ -6,11 +6,166 @@ function sha256(str: string): string {
   return createHash('sha256').update(str.normalize('NFKC')).digest('hex');
 }
 
+// Função para retry com backoff exponencial
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T> {
+  let lastError: Error;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      console.warn(`⚠️ Tentativa ${attempt}/${maxRetries} falhou:`, error.message);
+      
+      if (attempt < maxRetries) {
+        const delay = baseDelay * Math.pow(2, attempt - 1);
+        console.log(`⏳ Aguardando ${delay}ms antes da próxima tentativa...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  throw lastError;
+}
+
+// Função para classificar erros do Facebook
+function classifyFacebookError(error: any): { type: string; retryable: boolean; message: string } {
+  if (!error || !error.error) {
+    return {
+      type: 'unknown',
+      retryable: true,
+      message: 'Erro desconhecido'
+    };
+  }
+  
+  const errorCode = error.error.code;
+  const errorSubcode = error.error.error_subcode;
+  const errorMessage = error.error.message || '';
+  
+  // Erros não retryable - problemas de autenticação ou permissão
+  if (errorCode === 190) { // Invalid OAuth access token
+    return {
+      type: 'auth_error',
+      retryable: false,
+      message: 'Token de acesso inválido ou expirado'
+    };
+  }
+  
+  if (errorCode === 200) { // Permission denied
+    return {
+      type: 'permission_error',
+      retryable: false,
+      message: 'Permissão negada para o Pixel'
+    };
+  }
+  
+  if (errorCode === 100) { // Invalid parameter
+    return {
+      type: 'validation_error',
+      retryable: false,
+      message: 'Parâmetros inválidos na requisição'
+    };
+  }
+  
+  // Erros retryable - problemas de rede, rate limit, etc.
+  if (errorCode === 4) { // Application throttle
+    return {
+      type: 'rate_limit',
+      retryable: true,
+      message: 'Limite de taxa excedido'
+    };
+  }
+  
+  if (errorCode === 1) { // API unknown
+    return {
+      type: 'api_error',
+      retryable: true,
+      message: 'Erro temporário da API'
+    };
+  }
+  
+  if (errorMessage.includes('timeout') || errorMessage.includes('connection')) {
+    return {
+      type: 'network_error',
+      retryable: true,
+      message: 'Erro de conexão ou timeout'
+    };
+  }
+  
+  // Padrão: considerar retryable para erros desconhecidos
+  return {
+    type: 'unknown',
+    retryable: true,
+    message: errorMessage || 'Erro desconhecido'
+  };
+}
+
+// Função para log detalhado de erro
+function logDetailedError(event_name: string, error: any, attempt: number) {
+  const errorClassification = classifyFacebookError(error);
+  
+  console.group(`🚨 Erro no evento ${event_name} (Tentativa ${attempt})`);
+  console.error('Tipo:', errorClassification.type);
+  console.error('Retryable:', errorClassification.retryable);
+  console.error('Mensagem:', errorClassification.message);
+  console.error('Resposta completa:', error);
+  console.groupEnd();
+  
+  return errorClassification;
+}
+
+// Função para enviar evento para Facebook com retry
+async function sendEventToFacebook(eventData: any, maxRetries: number = 3): Promise<{ success: boolean; result?: any; error?: any }> {
+  const { event_name, pixel_id } = eventData;
+  
+  try {
+    const response = await retryWithBackoff(async () => {
+      const facebookResponse = await fetch(`https://graph.facebook.com/v23.0/${pixel_id}/events?access_token=${process.env.FACEBOOK_ACCESS_TOKEN}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(eventData.data)
+      });
+      
+      if (!facebookResponse.ok) {
+        const errorResult = await facebookResponse.json();
+        throw errorResult;
+      }
+      
+      return facebookResponse.json();
+    }, maxRetries);
+    
+    return {
+      success: true,
+      result: response
+    };
+    
+  } catch (error) {
+    const errorClassification = logDetailedError(event_name, error, maxRetries);
+    
+    return {
+      success: false,
+      error: {
+        ...error,
+        classification: errorClassification
+      }
+    };
+  }
+}
+
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+  const requestId = Math.random().toString(36).substr(2, 9);
+  
   try {
     const body = await request.json();
     
-    console.log('📥 Recebido dados do Facebook Pixel:', JSON.stringify(body, null, 2));
+    console.log(`📥 [${requestId}] Recebido dados do Facebook Pixel:`, JSON.stringify(body, null, 2));
     
     // Extrair dados do evento
     const { event_name, event_id, pixel_id, user_data, custom_data } = body;
@@ -37,6 +192,9 @@ export async function POST(request: NextRequest) {
     
     // Preparar dados no formato EXATO que o Facebook API espera
     const facebookEventData = {
+      event_name,
+      event_id,
+      pixel_id,
       data: [{
         event_name: event_name,
         event_id: event_id,
@@ -80,8 +238,8 @@ export async function POST(request: NextRequest) {
     };
     
     // Log dos dados formatados para depuração
-    console.log('📤 Dados formatados para Facebook API:', JSON.stringify(facebookEventData, null, 2));
-    console.log('🔐 Dados do usuário com hash:', {
+    console.log(`📤 [${requestId}] Dados formatados para Facebook API:`, JSON.stringify(facebookEventData, null, 2));
+    console.log(`🔐 [${requestId}] Dados do usuário com hash:`, {
       em: user_data.em ? `${user_data.em} -> ${hashedUserData.em}` : 'N/A',
       ph: user_data.ph ? `${user_data.ph} -> ${hashedUserData.ph}` : 'N/A',
       fn: user_data.fn ? `${user_data.fn} -> ${hashedUserData.fn}` : 'N/A',
@@ -92,42 +250,53 @@ export async function POST(request: NextRequest) {
       country: user_data.country ? `${user_data.country} -> ${hashedUserData.country}` : 'N/A',
     });
     
-    // Enviar para Facebook Conversion API
-    const facebookResponse = await fetch(`https://graph.facebook.com/v23.0/${pixel_id}/events?access_token=${process.env.FACEBOOK_ACCESS_TOKEN}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(facebookEventData)
-    });
+    // Enviar para Facebook Conversion API com retry
+    const facebookResult = await sendEventToFacebook(facebookEventData, 3);
     
-    const facebookResult = await facebookResponse.json();
+    const processingTime = Date.now() - startTime;
     
-    console.log('📊 Resposta do Facebook:', facebookResult);
-    
-    if (facebookResponse.ok) {
+    if (facebookResult.success) {
+      console.log(`✅ [${requestId}] Evento enviado com sucesso para Facebook em ${processingTime}ms:`, facebookResult.result);
+      
       return NextResponse.json({
         success: true,
         message: 'Evento enviado com sucesso para Facebook',
-        facebookResponse: facebookResult,
-        hashedData: hashedUserData
+        facebookResponse: facebookResult.result,
+        hashedData: hashedUserData,
+        processingTime,
+        requestId,
+        retryAttempts: 0
       });
     } else {
-      console.error('❌ Erro ao enviar evento para Facebook:', facebookResult);
+      const errorClassification = facebookResult.error.classification;
+      
+      console.error(`❌ [${requestId}] Falha ao enviar evento para Facebook após todas as tentativas:`, facebookResult.error);
+      
+      // Se o erro não for retryable, retornar status específico
+      const status = errorClassification.retryable ? 503 : 400;
+      
       return NextResponse.json({
         success: false,
-        message: 'Erro ao enviar evento para Facebook',
-        error: facebookResult,
-        hashedData: hashedUserData
-      }, { status: 400 });
+        message: `Erro ao enviar evento para Facebook: ${errorClassification.message}`,
+        error: facebookResult.error,
+        hashedData: hashedUserData,
+        processingTime,
+        requestId,
+        retryable: errorClassification.retryable,
+        errorType: errorClassification.type
+      }, { status });
     }
     
   } catch (error) {
-    console.error('❌ Erro no processamento do evento:', error);
+    const processingTime = Date.now() - startTime;
+    console.error(`❌ [${requestId}] Erro no processamento do evento após ${processingTime}ms:`, error);
+    
     return NextResponse.json({
       success: false,
       message: 'Erro interno no servidor',
-      error: error.message
+      error: error.message,
+      processingTime,
+      requestId
     }, { status: 500 });
   }
 }

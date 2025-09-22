@@ -335,6 +335,8 @@ export default function App() {
               </div>
               <div className="text-xs sm:text-sm mt-2">💳 Ou 12x de R$ 3,99 sem juros</div>
             </div>
+            
+  
           </div>
         </div>
       </div>
