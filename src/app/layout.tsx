@@ -6,7 +6,6 @@ import GoogleTagManager from "@/components/GoogleTagManager";
 import AdvancedTracking from "@/components/AdvancedTracking";
 import GTMDataLayerChecker from "@/components/GTMDataLayerChecker";
 import FacebookPixelDebugger from "@/components/FacebookPixelDebugger";
-import UTMify from "@/components/UTMify";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -53,7 +52,6 @@ export default function RootLayout({
         <AdvancedTracking />
         <GTMDataLayerChecker />
         <FacebookPixelDebugger />
-        <UTMify />
         {children}
         <Toaster />
       </body>

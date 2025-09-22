@@ -66,149 +66,6 @@ export function captureFbclid(): void {
 }
 
 /**
- * Captura parâmetros UTM da URL e os armazena em localStorage e cookies
- * Esta função deve ser chamada no carregamento da página
- */
-export function captureUTMParameters(): void {
-  if (typeof window === 'undefined') return;
-  
-  console.log('🚀 Capturando parâmetros UTM...');
-  
-  // Capturar parâmetros UTM da URL
-  const urlParams = new URLSearchParams(window.location.search);
-  const utmParams = {
-    utm_source: urlParams.get('utm_source'),
-    utm_medium: urlParams.get('utm_medium'),
-    utm_campaign: urlParams.get('utm_campaign'),
-    utm_content: urlParams.get('utm_content'),
-    utm_term: urlParams.get('utm_term')
-  };
-  
-  // Armazenar no localStorage (duração mais longa)
-  Object.entries(utmParams).forEach(([key, value]) => {
-    if (value) {
-      localStorage.setItem(key, value);
-      console.log(`✅ UTM ${key} armazenado no localStorage:`, value);
-    }
-  });
-  
-  // Armazenar em cookies como backup (30 dias)
-  Object.entries(utmParams).forEach(([key, value]) => {
-    if (value) {
-      const expirationDate = new Date();
-      expirationDate.setDate(expirationDate.getDate() + 30);
-      document.cookie = `${key}=${value}; expires=${expirationDate.toUTCString()}; path=/; domain=${window.location.hostname}; SameSite=Lax`;
-      console.log(`✅ UTM ${key} armazenado em cookie:`, value);
-    }
-  });
-  
-  // Log de status dos UTMs
-  console.log('📊 Status dos parâmetros UTM:');
-  Object.keys(utmParams).forEach(key => {
-    const value = utmParams[key as keyof typeof utmParams];
-    console.log(`   - ${key}:`, value || 'Não encontrado');
-  });
-}
-
-/**
- * Obtém parâmetros UTM armazenados (localStorage优先, cookie fallback)
- * @returns Objeto com os parâmetros UTM
- */
-export function getStoredUTMParameters(): {
-  utm_source: string | null;
-  utm_medium: string | null;
-  utm_campaign: string | null;
-  utm_content: string | null;
-  utm_term: string | null;
-} {
-  const utmParams = {
-    utm_source: null as string | null,
-    utm_medium: null as string | null,
-    utm_campaign: null as string | null,
-    utm_content: null as string | null,
-    utm_term: null as string | null
-  };
-  
-  if (typeof window === 'undefined') return utmParams;
-  
-  // Tentar obter do localStorage primeiro
-  Object.keys(utmParams).forEach(key => {
-    const value = localStorage.getItem(key);
-    if (value) {
-      utmParams[key as keyof typeof utmParams] = value;
-    }
-  });
-  
-  // Fallback para cookies
-  Object.keys(utmParams).forEach(key => {
-    if (!utmParams[key as keyof typeof utmParams]) {
-      const value = getCookie(key);
-      if (value) {
-        utmParams[key as keyof typeof utmParams] = value;
-      }
-    }
-  });
-  
-  return utmParams;
-}
-
-/**
- * Adiciona campos ocultos de UTM a um formulário
- * @param form Elemento do formulário onde adicionar os campos
- */
-export function addUTMHiddenFields(form: HTMLFormElement): void {
-  if (typeof window === 'undefined') return;
-  
-  const utmParams = getStoredUTMParameters();
-  
-  Object.entries(utmParams).forEach(([key, value]) => {
-    if (value) {
-      // Verificar se campo já existe
-      let input = form.querySelector(`input[name="${key}"]`) as HTMLInputElement;
-      if (!input) {
-        input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = key;
-        input.id = key;
-        form.appendChild(input);
-      }
-      input.value = value;
-      console.log(`📝 Campo UTM ${key} adicionado ao formulário:`, value);
-    }
-  });
-}
-
-/**
- * Constrói URL com parâmetros UTM
- * @param baseUrl URL base
- * @param additionalParams Parâmetros adicionais para incluir
- * @returns URL completa com parâmetros UTM
- */
-export function buildURLWithUTM(baseUrl: string, additionalParams: Record<string, string> = {}): string {
-  if (typeof window === 'undefined') return baseUrl;
-  
-  const url = new URL(baseUrl);
-  const utmParams = getStoredUTMParameters();
-  
-  // Adicionar parâmetros UTM
-  Object.entries(utmParams).forEach(([key, value]) => {
-    if (value) {
-      url.searchParams.set(key, value);
-    }
-  });
-  
-  // Adicionar parâmetros adicionais
-  Object.entries(additionalParams).forEach(([key, value]) => {
-    if (value) {
-      url.searchParams.set(key, value);
-    }
-  });
-  
-  console.log('🔗 URL construída com UTM:', url.toString());
-  return url.toString();
-}
-
-/**
  * Função para inicializar a captura de parâmetros de rastreamento
  * Deve ser chamada no carregamento da página
  */
@@ -220,20 +77,11 @@ export function initializeTracking(): void {
   // Capturar fbclid e criar cookie _fbc
   captureFbclid();
   
-  // Capturar parâmetros UTM
-  captureUTMParameters();
-  
   // Log de status dos cookies
   const { fbc, fbp } = getFacebookCookies();
-  const utmParams = getStoredUTMParameters();
   console.log('📊 Status dos cookies de rastreamento:');
   console.log('   - _fbc:', fbc || 'Não encontrado');
   console.log('   - _fbp:', fbp || 'Não encontrado');
-  console.log('📊 Status dos parâmetros UTM:');
-  Object.keys(utmParams).forEach(key => {
-    const value = utmParams[key as keyof typeof utmParams];
-    console.log(`   - ${key}:`, value || 'Não encontrado');
-  });
 }
 
 /**

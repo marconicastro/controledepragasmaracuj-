@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, X, AlertTriangle, Clock, Shield, Star, Rocket, Phone, Mail, TrendingUp, Target, Zap, Award, Users, DollarSign, ArrowRight, PlayCircle, Download } from 'lucide-react';
 import PreCheckoutModal from '@/components/PreCheckoutModal';
-import { getFacebookCookies, getGoogleClientId, buildURLWithUTM, getStoredUTMParameters } from '@/lib/cookies';
+import { getFacebookCookies, getGoogleClientId } from '@/lib/cookies';
 import META_CONFIG from '@/lib/metaConfig';
 
 export default function App() {
@@ -59,17 +59,14 @@ export default function App() {
     // Capturar cookies necessários usando os utilitários
     const { fbc, fbp } = getFacebookCookies();
     const clientId = getGoogleClientId();
-    
-    // Capturar parâmetros UTM armazenados
-    const utmParams = getStoredUTMParameters();
-    console.log('📊 Parâmetros UTM capturados:', utmParams);
 
-    // Construir parâmetros adicionais para o checkout
-    const additionalParams: Record<string, string> = {};
+    // Construir URL limpa e definitiva com URLSearchParams
+    const baseUrl = META_CONFIG.HOTMART.checkoutUrl;
+    const finalUrl = new URL(baseUrl);
     
     // 1. Parâmetros de Rastreamento (Manter)
     if (clientId) {
-      additionalParams['cid'] = clientId;
+      finalUrl.searchParams.set('cid', clientId);
     }
 
     // Montar parâmetros de rastreamento da Meta (sck)
@@ -82,12 +79,15 @@ export default function App() {
     }
     const sckValue = sckParams.toString();
     if (sckValue) {
-      additionalParams['sck'] = sckValue;
+      finalUrl.searchParams.set('sck', sckValue);
     }
 
-    // 2. Parâmetros de Pré-preenchimento
-    additionalParams['name'] = cleanFullName;
-    additionalParams['email'] = formData.email;
+    // 2. Parâmetros de Pré-preenchimento - VERSÃO SIMPLES E FUNCIONAL
+    console.log('📝 Adicionando parâmetro name:', cleanFullName);
+    finalUrl.searchParams.set('name', cleanFullName);
+    
+    console.log('📧 Adicionando parâmetro email:', formData.email);
+    finalUrl.searchParams.set('email', formData.email);
     
     // Para o Telefone: Formato esperado pela máscara "99 99999-9999"
     const phoneClean = formData.phone.replace(/\D/g, '');
@@ -109,7 +109,9 @@ export default function App() {
         const numeroFormatado = `${ddd} ${primeiraParte}-${segundaParte}`;
         
         console.log('Número formatado:', numeroFormatado);
-        additionalParams['phone_number'] = numeroFormatado;
+        
+        // Enviar o telefone completo formatado no campo phone_number
+        finalUrl.searchParams.set('phone_number', numeroFormatado);
       } else if (numeroCompleto.length === 8) {
         // Fixo: 98276042 -> 77 9827-6042
         const primeiraParte = numeroCompleto.substring(0, 4); // 9827
@@ -117,41 +119,46 @@ export default function App() {
         const numeroFormatado = `${ddd} ${primeiraParte}-${segundaParte}`;
         
         console.log('Número formatado:', numeroFormatado);
-        additionalParams['phone_number'] = numeroFormatado;
+        
+        // Enviar o telefone completo formatado no campo phone_number
+        finalUrl.searchParams.set('phone_number', numeroFormatado);
       } else {
         // Fallback: enviar DDD + número sem formatação
         const numeroFormatado = `${ddd} ${numeroCompleto}`;
-        additionalParams['phone_number'] = numeroFormatado;
+        finalUrl.searchParams.set('phone_number', numeroFormatado);
       }
     }
 
     // 3. Parâmetros adicionais
     if (formData.city && formData.city.trim() !== '') {
-      additionalParams['city'] = formData.city.trim();
+      finalUrl.searchParams.set('city', formData.city.trim());
     }
     
     if (formData.state && formData.state.trim() !== '') {
-      additionalParams['state'] = formData.state.trim();
+      finalUrl.searchParams.set('state', formData.state.trim());
     }
     
     if (formData.cep && formData.cep.replace(/\D/g, '').length === 8) {
       const cleanCEP = formData.cep.replace(/\D/g, '');
-      additionalParams['zip'] = cleanCEP;
+      finalUrl.searchParams.set('zip', cleanCEP);
     }
 
-    // Usar a função buildURLWithUTM para construir a URL final com todos os parâmetros
-    const finalUrlString = buildURLWithUTM(META_CONFIG.HOTMART.checkoutUrl, additionalParams);
+    // Converter para string final
+    const finalUrlString = finalUrl.toString();
 
     // Log para depuração
-    console.log('=== URL FINAL COMPLETA COM UTM ===');
+    console.log('=== URL FINAL COMPLETA ===');
     console.log('URL:', finalUrlString);
-    
-    // Parse da URL para log detalhado
-    const finalUrl = new URL(finalUrlString);
     console.log('Parâmetros:');
-    finalUrl.searchParams.forEach((value, key) => {
-      console.log(`${key}:`, value);
-    });
+    console.log('name:', finalUrl.searchParams.get('name'));
+    console.log('email:', finalUrl.searchParams.get('email'));
+    console.log('phone_local_code:', finalUrl.searchParams.get('phone_local_code'));
+    console.log('phone_number:', finalUrl.searchParams.get('phone_number'));
+    console.log('city:', finalUrl.searchParams.get('city'));
+    console.log('state:', finalUrl.searchParams.get('state'));
+    console.log('zip:', finalUrl.searchParams.get('zip'));
+    console.log('cid:', finalUrl.searchParams.get('cid'));
+    console.log('sck:', finalUrl.searchParams.get('sck'));
 
     // Enriquecer dados do usuário para melhor rastreamento
     const userData = {
@@ -178,13 +185,7 @@ export default function App() {
       fbc: fbc,
       fbp: fbp,
       ga_client_id: clientId,
-      external_id: formData.email ? formData.email.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() : undefined,
-      // Incluir UTM parameters para rastreamento
-      utm_source: utmParams.utm_source,
-      utm_medium: utmParams.utm_medium,
-      utm_campaign: utmParams.utm_campaign,
-      utm_content: utmParams.utm_content,
-      utm_term: utmParams.utm_term
+      external_id: formData.email ? formData.email.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() : undefined
     };
 
     console.log('📊 Dados do usuário enriquecidos para Meta:', enrichedUserData);
@@ -205,13 +206,6 @@ export default function App() {
       fbp: enrichedUserData.fbp,
       ga_client_id: enrichedUserData.ga_client_id,
       external_id: enrichedUserData.external_id
-    });
-    console.log('📊 Dados de UTM incluídos:', {
-      utm_source: enrichedUserData.utm_source,
-      utm_medium: enrichedUserData.utm_medium,
-      utm_campaign: enrichedUserData.utm_campaign,
-      utm_content: enrichedUserData.utm_content,
-      utm_term: enrichedUserData.utm_term
     });
 
     // Disparar evento de checkout com dados do usuário enriquecidos
