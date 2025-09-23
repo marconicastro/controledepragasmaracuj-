@@ -258,7 +258,7 @@ export function getGoogleClientId(): string | null {
  * Captura nome, sobrenome, email e telefone dos campos do formulário sem precisar de campos adicionais
  * @returns Objeto com dados pessoais ou null se não encontrar
  */
-export function getFormLocationData(): {
+export function getFormPersonalData(): {
   fn: string;
   ln: string;
   em: string;
@@ -341,14 +341,14 @@ export function getFormLocationData(): {
  * Obtém dados pessoais de ALTA QUALIDADE incluindo captura de dados do formulário
  * @returns Promise com dados pessoais da melhor fonte disponível
  */
-export async function getHighQualityLocationData(): Promise<{
+export async function getHighQualityPersonalData(): Promise<{
   fn: string;
   ln: string;
   em: string;
   ph: string;
 }> {
   // 1. Tentar obter dados do formulário (mais precisos se disponíveis)
-  const formData = getFormLocationData();
+  const formData = getFormPersonalData();
   if (formData) {
     console.log('🌍 Usando dados pessoais do formulário:', formData);
     return formData;
@@ -362,6 +362,111 @@ export async function getHighQualityLocationData(): Promise<{
     em: '',
     ph: ''
   };
+}
+
+/**
+ * Obtém dados de localização do formulário automaticamente
+ * Captura cidade, estado e CEP dos campos do formulário sem precisar de campos adicionais
+ * @returns Objeto com dados de localização ou null se não encontrar
+ */
+export function getFormLocationData(): {
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+} | null {
+  if (typeof document === 'undefined') return null;
+  
+  console.log('🔍 Procurando dados de localização no formulário...');
+  
+  // Mapeamento de possíveis nomes de campos para cidade
+  const cityFields = ['city', 'cidade', 'localidade', 'location', 'municipio'];
+  // Mapeamento de possíveis nomes de campos para estado
+  const stateFields = ['state', 'estado', 'uf', 'province', 'provincia'];
+  // Mapeamento de possíveis nomes de campos para CEP
+  const zipFields = ['zip', 'cep', 'postalcode', 'codigo_postal'];
+  
+  let city = '';
+  let state = '';
+  let zip = '';
+  
+  // Procurar campos de cidade
+  for (const fieldName of cityFields) {
+    const input = document.querySelector(`input[name*="${fieldName}"], input[id*="${fieldName}"]`) as HTMLInputElement;
+    if (input && input.value.trim()) {
+      city = input.value.trim();
+      console.log(`✅ Cidade encontrada no campo "${fieldName}":`, city);
+      break;
+    }
+  }
+  
+  // Procurar campos de estado
+  for (const fieldName of stateFields) {
+    const input = document.querySelector(`input[name*="${fieldName}"], input[id*="${fieldName}"], select[name*="${fieldName}"], select[id*="${fieldName}"]`) as HTMLInputElement | HTMLSelectElement;
+    if (input && input.value.trim()) {
+      state = input.value.trim();
+      console.log(`✅ Estado encontrado no campo "${fieldName}":`, state);
+      break;
+    }
+  }
+  
+  // Procurar campos de CEP
+  for (const fieldName of zipFields) {
+    const input = document.querySelector(`input[name*="${fieldName}"], input[id*="${fieldName}"]`) as HTMLInputElement;
+    if (input && input.value.trim()) {
+      zip = input.value.trim();
+      console.log(`✅ CEP encontrado no campo "${fieldName}":`, zip);
+      break;
+    }
+  }
+  
+  // Se encontrou pelo menos um dado de localização, retornar o objeto
+  if (city || state || zip) {
+    console.log('🎯 Dados de localização capturados do formulário:', { city, state, zip });
+    return {
+      city: city || '',
+      state: state || '',
+      zip: zip || '',
+      country: 'BR' // Padrão Brasil
+    };
+  }
+  
+  console.log('ℹ️ Nenhum dado de localização encontrado no formulário');
+  return null;
+}
+
+/**
+ * Obtém dados de localização de ALTA QUALIDADE incluindo captura de dados do formulário
+ * @returns Promise com dados de localização da melhor fonte disponível
+ */
+export async function getHighQualityLocationData(): Promise<{
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+}> {
+  // 1. Tentar obter dados do formulário (mais preciso se disponível)
+  const formData = getFormLocationData();
+  if (formData) {
+    console.log('🌍 Usando dados do formulário:', formData);
+    return formData;
+  }
+  
+  // 2. Tentar obter dados em cache (rápido e confiável)
+  const cachedGeoData = getCachedGeographicData();
+  if (cachedGeoData) {
+    console.log('🌍 Usando dados geográficos em cache:', cachedGeoData);
+    return {
+      city: cachedGeoData.city,
+      state: cachedGeoData.state,
+      zip: cachedGeoData.zip,
+      country: cachedGeoData.country
+    };
+  }
+  
+  // 3. Fallback para API externa
+  console.log('🌍 Buscando dados de localização via API externa...');
+  return await getLocationData();
 }
 
 /**
@@ -669,6 +774,8 @@ export default {
   getCookie,
   getFacebookCookies,
   getGoogleClientId,
+  getFormPersonalData,
+  getHighQualityPersonalData,
   getFormLocationData,
   getHighQualityLocationData,
   getLocationData,

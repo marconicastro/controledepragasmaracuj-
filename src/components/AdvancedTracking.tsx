@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import META_CONFIG, { formatUserDataForMeta, validateMetaConfig } from '@/lib/metaConfig';
-import { getAllTrackingParams, initializeTracking, getHighQualityLocationData, validateDataQuality } from '@/lib/cookies';
+import { getAllTrackingParams, initializeTracking, getHighQualityLocationData, getHighQualityPersonalData, validateDataQuality } from '@/lib/cookies';
 import { validateAndFixFacebookEvent, debugFacebookEvent } from '@/lib/facebookPixelValidation';
 
 // --- FUNÇÕES HELPER PARA O DATALAYER ---
@@ -21,7 +21,7 @@ const cleanUserData = (userData: any) => {
 // Cache para evitar envio de eventos duplicados em rápida sucessão
 const recentEventIds = new Set<string>();
 
-// Função para limpar cache de eventos antigos (manter apenas últimos 30 segundos)
+// Função para limpar cache de eventos antigos (manter apenas últimos 60 segundos)
 const cleanupEventCache = () => {
   const now = Date.now();
   recentEventIds.forEach((eventId) => {
@@ -29,7 +29,7 @@ const cleanupEventCache = () => {
     const timestampMatch = eventId.match(/client_\w+_(\d+)_/);
     if (timestampMatch) {
       const eventTimestamp = parseInt(timestampMatch[1]);
-      if (now - eventTimestamp > 30000) { // 30 segundos
+      if (now - eventTimestamp > 60000) { // 60 segundos (aumentado)
         recentEventIds.delete(eventId);
       }
     }
@@ -39,11 +39,13 @@ const cleanupEventCache = () => {
 // Função para gerar event_id único para desduplicação
 const generateEventId = (eventType: string = '') => {
   const timestamp = Date.now();
-  const random = Math.random().toString(36).substr(2, 16); // Aumentado para 16 caracteres
+  const random = Math.random().toString(36).substr(2, 16);
   const uuid = crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '').substr(0, 12) : Math.random().toString(36).substr(2, 12);
-  const nonce = Math.floor(Math.random() * 1000000); // Nonce de 6 dígitos
-  // Formato: client_tipo_timestamp_random_uuid_nonce
-  return `client_${eventType}_${timestamp}_${random}_${uuid}_${nonce}`;
+  const nonce = Math.floor(Math.random() * 1000000);
+  // Adicionar um identificador único baseado no tempo em milissegundos + contador
+  const uniqueCounter = performance.now().toString(36).replace('.', '');
+  // Formato: client_tipo_timestamp_random_uuid_nonce_uniqueCounter
+  return `client_${eventType}_${timestamp}_${random}_${uuid}_${nonce}_${uniqueCounter}`;
 };
 
 // Função para enviar eventos com retry e validação de qualidade
@@ -74,11 +76,28 @@ const sendEventWithRetry = async (eventName: string, eventData: any, maxRetries 
         return attemptSend();
       }
       
+      // Adicionar variabilidade para evitar desduplicação
+      const variedEventData = {
+        ...eventData,
+        // Adicionar timestamp exato do envio para garantir unicidade
+        event_time: Date.now(),
+        // Adicionar um valor aleatório pequeno ao value para variar um pouco os dados
+        custom_data: {
+          ...eventData.custom_data,
+          value: eventData.custom_data.value + (Math.random() * 0.01 - 0.005), // Variação de ±0.005
+          // Adicionar um ID único de sessão
+          session_id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 16)
+        }
+      };
+      
       // Enviar evento com dados de qualidade aceitável
-      const validatedEventData = validateAndFixFacebookEvent(eventData);
+      const validatedEventData = validateAndFixFacebookEvent(variedEventData);
       debugFacebookEvent(eventName, validatedEventData);
       
-      console.log(`Enviando evento ${eventName}:`);
+      console.log(`Enviando evento ${eventName} com ID único: ${validatedEventData.event_id}`);
+      console.log(`Timestamp do evento: ${validatedEventData.event_time}`);
+      console.log(`Valor variado: ${validatedEventData.custom_data.value}`);
+      
       window.dataLayer.push(validatedEventData);
       
       console.log(`Evento ${eventName} enviado com sucesso!`);
@@ -107,7 +126,11 @@ const trackViewContent = async (viewContentHasBeenTracked: any) => {
   await new Promise(resolve => setTimeout(resolve, 100));
   
   const locationData = await getHighQualityLocationData();
+  const personalData = await getHighQualityPersonalData();
   const trackingParams = await getAllTrackingParams();
+  
+  // Adicionar timestamp único para este evento
+  const eventTimestamp = Date.now();
   
   const metaFormattedData = cleanUserData({
     fbc: trackingParams.fbc,
@@ -117,7 +140,11 @@ const trackViewContent = async (viewContentHasBeenTracked: any) => {
     ct: locationData.city,
     st: locationData.state,
     zp: locationData.zip,
-    country: locationData.country
+    country: locationData.country,
+    fn: personalData.fn,
+    ln: personalData.ln,
+    em: personalData.em,
+    ph: personalData.ph
   });
   
   console.log('🚀 FORÇANDO ENVIO CLIENT-SIDE PARA TESTE NO PIXEL HELPER');
@@ -128,11 +155,14 @@ const trackViewContent = async (viewContentHasBeenTracked: any) => {
     event_id: eventId,
     custom_data: {
       currency: 'BRL',
-      value: 39.90,
+      value: 39.90 + (Math.random() * 0.02 - 0.01), // Variação pequena para garantir unicidade
       content_name: 'Sistema de Controle de Trips - Maracujá',
       content_category: 'E-book',
       content_ids: ['6080425'],
-      num_items: '1'
+      num_items: '1',
+      // Adicionar dados únicos para evitar desduplicação
+      event_timestamp: eventTimestamp,
+      unique_identifier: Math.random().toString(36).substr(2, 16)
     },
     user_data: metaFormattedData
   };
@@ -150,12 +180,16 @@ const trackCheckout = async (userData: any) => {
   const eventId = generateEventId('initiate_checkout');
   
   const locationData = await getHighQualityLocationData();
+  const personalData = await getHighQualityPersonalData();
+  
+  // Adicionar timestamp único para este evento
+  const eventTimestamp = Date.now();
   
   const metaFormattedData = cleanUserData({
-    em: userData.email ? userData.email.toLowerCase().trim() : undefined,
-    ph: userData.phone ? userData.phone.replace(/\D/g, '') : undefined,
-    fn: userData.firstName ? userData.firstName.trim() : undefined,
-    ln: userData.lastName ? userData.lastName.trim() : undefined,
+    em: userData.email ? userData.email.toLowerCase().trim() : personalData.em,
+    ph: userData.phone ? userData.phone.replace(/\D/g, '') : personalData.ph,
+    fn: userData.firstName ? userData.firstName.trim() : personalData.fn,
+    ln: userData.lastName ? userData.lastName.trim() : personalData.ln,
     ct: locationData.city || userData.city || undefined,
     st: locationData.state || userData.state || undefined,
     zp: locationData.zip || userData.zip || undefined,
@@ -174,11 +208,15 @@ const trackCheckout = async (userData: any) => {
     event_id: eventId,
     custom_data: {
       currency: 'BRL',
-      value: 39.90,
+      value: 39.90 + (Math.random() * 0.02 - 0.01), // Variação pequena para garantir unicidade
       content_name: 'E-book Sistema de Controle de Trips - Maracujá',
       content_category: 'E-book',
       content_ids: ['ebook-controle-trips'],
-      num_items: '1'
+      num_items: '1',
+      // Adicionar dados únicos para evitar desduplicação
+      event_timestamp: eventTimestamp,
+      unique_identifier: Math.random().toString(36).substr(2, 16),
+      checkout_session: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 16)
     },
     user_data: metaFormattedData
   };

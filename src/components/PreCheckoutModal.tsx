@@ -197,7 +197,7 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
             </Label>
             <Input
               id="fullName"
-              placeholder="Digite seu nome completo"
+              placeholder="Ex: João Silva"
               {...register('fullName')}
               className={errors.fullName ? 'border-red-500' : ''}
             />
@@ -232,7 +232,7 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
             </Label>
             <Input
               id="phone"
-              placeholder="(77) 99827-606"
+              placeholder="(11) 99999-9999"
               {...register('phone')}
               onChange={handlePhoneChange}
               maxLength={15}
@@ -251,7 +251,7 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
             </Label>
             <Input
               id="cep"
-              placeholder="00000-000"
+              placeholder="01310-100"
               {...register('cep')}
               onChange={handleCEPChange}
               onBlur={onCEPBlur}
@@ -272,7 +272,7 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
               </Label>
               <Input
                 id="city"
-                placeholder="São Paulo"
+                placeholder="Ex: São Paulo"
                 {...register('city')}
                 className={errors.city ? 'border-red-500' : ''}
               />
@@ -288,7 +288,7 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
               </Label>
               <Input
                 id="state"
-                placeholder="SP"
+                placeholder="Ex: SP"
                 {...register('state')}
                 onChange={handleUFChange}
                 maxLength={2}
