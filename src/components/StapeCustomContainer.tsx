@@ -15,6 +15,13 @@ declare global {
   }
 }
 
+// Função para gerar event_id único para desduplicação
+const generateEventId = (eventType: string = '') => {
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substr(2, 9);
+  return `${eventType}_${timestamp}_${random}`;
+};
+
 interface StapeCustomContainerProps {
   gtmId: string;
 }
@@ -156,7 +163,7 @@ export default function StapeCustomContainer({ gtmId = 'GTM-567XZCDX' }: StapeCu
       }
       
       // 5. Gerar event_id consistente para correlação
-      const eventId = 'pageview_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2);
+      const eventId = generateEventId('pageview');
       
       // 6. Enviar PageView com FBC garantido (agora com atraso estratégico)
       console.log('📍 Enviando PageView COM FBC (após server-side):', fbc ? '✅ ' + fbc : '❌ Não encontrado');
