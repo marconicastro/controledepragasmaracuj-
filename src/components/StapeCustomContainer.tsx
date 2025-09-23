@@ -15,11 +15,32 @@ declare global {
   }
 }
 
+// Cache para evitar envio de eventos duplicados em rápida sucessão
+const recentEventIds = new Set<string>();
+
+// Função para limpar cache de eventos antigos (manter apenas últimos 30 segundos)
+const cleanupEventCache = () => {
+  const now = Date.now();
+  recentEventIds.forEach((eventId) => {
+    // Extrair timestamp do eventId (formato: client_tipo_timestamp_...)
+    const timestampMatch = eventId.match(/client_\w+_(\d+)_/);
+    if (timestampMatch) {
+      const eventTimestamp = parseInt(timestampMatch[1]);
+      if (now - eventTimestamp > 30000) { // 30 segundos
+        recentEventIds.delete(eventId);
+      }
+    }
+  });
+};
+
 // Função para gerar event_id único para desduplicação
 const generateEventId = (eventType: string = '') => {
   const timestamp = Date.now();
-  const random = Math.random().toString(36).substr(2, 9);
-  return `${eventType}_${timestamp}_${random}`;
+  const random = Math.random().toString(36).substr(2, 16); // Aumentado para 16 caracteres
+  const uuid = crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '').substr(0, 12) : Math.random().toString(36).substr(2, 12);
+  const nonce = Math.floor(Math.random() * 1000000); // Nonce de 6 dígitos
+  // Formato: client_tipo_timestamp_random_uuid_nonce
+  return `client_${eventType}_${timestamp}_${random}_${uuid}_${nonce}`;
 };
 
 interface StapeCustomContainerProps {
@@ -164,6 +185,18 @@ export default function StapeCustomContainer({ gtmId = 'GTM-567XZCDX' }: StapeCu
       
       // 5. Gerar event_id consistente para correlação
       const eventId = generateEventId('pageview');
+      
+      // Verificar se este evento ID já foi enviado recentemente
+      if (recentEventIds.has(eventId)) {
+        console.warn(`⚠️ PageView com ID ${eventId} já enviado recentemente, ignorando...`);
+        return;
+      }
+      
+      // Adicionar ao cache de eventos recentes
+      recentEventIds.add(eventId);
+      
+      // Limpar cache de eventos antigos
+      cleanupEventCache();
       
       // 6. Enviar PageView com FBC garantido (agora com atraso estratégico)
       console.log('📍 Enviando PageView COM FBC (após server-side):', fbc ? '✅ ' + fbc : '❌ Não encontrado');

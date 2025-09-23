@@ -18,16 +18,49 @@ const cleanUserData = (userData: any) => {
   return cleaned;
 };
 
+// Cache para evitar envio de eventos duplicados em rápida sucessão
+const recentEventIds = new Set<string>();
+
+// Função para limpar cache de eventos antigos (manter apenas últimos 30 segundos)
+const cleanupEventCache = () => {
+  const now = Date.now();
+  recentEventIds.forEach((eventId) => {
+    // Extrair timestamp do eventId (formato: client_tipo_timestamp_...)
+    const timestampMatch = eventId.match(/client_\w+_(\d+)_/);
+    if (timestampMatch) {
+      const eventTimestamp = parseInt(timestampMatch[1]);
+      if (now - eventTimestamp > 30000) { // 30 segundos
+        recentEventIds.delete(eventId);
+      }
+    }
+  });
+};
+
 // Função para gerar event_id único para desduplicação
 const generateEventId = (eventType: string = '') => {
   const timestamp = Date.now();
-  const random = Math.random().toString(36).substr(2, 9);
-  return `${eventType}_${timestamp}_${random}`;
+  const random = Math.random().toString(36).substr(2, 16); // Aumentado para 16 caracteres
+  const uuid = crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '').substr(0, 12) : Math.random().toString(36).substr(2, 12);
+  const nonce = Math.floor(Math.random() * 1000000); // Nonce de 6 dígitos
+  // Formato: client_tipo_timestamp_random_uuid_nonce
+  return `client_${eventType}_${timestamp}_${random}_${uuid}_${nonce}`;
 };
 
 // Função para enviar eventos com retry e validação de qualidade
 const sendEventWithRetry = async (eventName: string, eventData: any, maxRetries = 3) => {
   let retries = 0;
+  
+  // Verificar se este evento ID já foi enviado recentemente
+  if (recentEventIds.has(eventData.event_id)) {
+    console.warn(`⚠️ Evento ${eventName} com ID ${eventData.event_id} já enviado recentemente, ignorando...`);
+    return;
+  }
+  
+  // Adicionar ao cache de eventos recentes
+  recentEventIds.add(eventData.event_id);
+  
+  // Limpar cache de eventos antigos
+  cleanupEventCache();
   
   const attemptSend = async () => {
     try {
@@ -111,6 +144,9 @@ const trackViewContent = async (viewContentHasBeenTracked: any) => {
 
 // Função trackCheckout simplificada
 const trackCheckout = async (userData: any) => {
+  // Adicionar pequeno delay para garantir timestamp diferente
+  await new Promise(resolve => setTimeout(resolve, 50));
+  
   const eventId = generateEventId('initiate_checkout');
   
   const locationData = await getHighQualityLocationData();

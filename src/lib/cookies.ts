@@ -254,84 +254,114 @@ export function getGoogleClientId(): string | null {
 }
 
 /**
- * Obtém dados de localização de ALTA QUALIDADE com prioridade para dados do formulário
- * @returns Promise com dados de localização da melhor fonte disponível
+ * Obtém dados pessoais do formulário automaticamente
+ * Captura nome, sobrenome, email e telefone dos campos do formulário sem precisar de campos adicionais
+ * @returns Objeto com dados pessoais ou null se não encontrar
  */
-export async function getHighQualityLocationData(): Promise<{
-  city: string;
-  state: string;
-  zip: string;
-  country: string;
-}> {
-  // 1. Tentar obter dados do formulário primeiro (mais precisos)
-  const formLocation = getFormLocationData();
-  if (formLocation && formLocation.city && formLocation.state && formLocation.zip) {
-    console.log('🌍 Usando dados de localização do formulário (ALTA QUALIDADE):', formLocation);
-    return formLocation;
-  }
-  
-  // 2. Tentar obter dados em cache (rápido e confiável)
-  const cachedGeoData = getCachedGeographicData();
-  if (cachedGeoData) {
-    console.log('🌍 Usando dados geográficos em cache:', cachedGeoData);
-    return {
-      city: cachedGeoData.city,
-      state: cachedGeoData.state,
-      zip: cachedGeoData.zip,
-      country: cachedGeoData.country
-    };
-  }
-  
-  // 3. Fallback para API externa
-  console.log('🌍 Buscando dados de localização via API externa...');
-  return await getLocationData();
-}
-
-/**
- * Obtém dados de localização do formulário (se disponíveis)
- * Verifica se os campos do formulário estão preenchidos na página
- */
-function getFormLocationData(): {
-  city: string;
-  state: string;
-  zip: string;
-  country: string;
+export function getFormLocationData(): {
+  fn: string;
+  ln: string;
+  em: string;
+  ph: string;
 } | null {
   if (typeof document === 'undefined') return null;
   
-  try {
-    // Verificar se há elementos do formulário na página usando IDs (react-hook-form)
-    const cityElement = document.querySelector('#city') as HTMLInputElement;
-    const stateElement = document.querySelector('#state') as HTMLInputElement;
-    const zipElement = document.querySelector('#cep') as HTMLInputElement;
-    
-    const city = cityElement?.value?.trim();
-    const state = stateElement?.value?.trim();
-    const zip = zipElement?.value?.replace(/\D/g, '');
-    
-    console.log('🔍 Procurando dados do formulário:');
-    console.log('   - Elemento cidade encontrado:', !!cityElement);
-    console.log('   - Elemento estado encontrado:', !!stateElement);
-    console.log('   - Elemento CEP encontrado:', !!zipElement);
-    console.log('   - Valores:', { city, state, zip });
-    
-    // Retornar apenas se todos os campos estiverem preenchidos
-    if (city && state && zip && zip.length === 8) {
-      console.log('✅ Dados completos do formulário encontrados!');
-      return {
-        city: city,
-        state: state.toUpperCase(),
-        zip: zip,
-        country: 'BR'
-      };
-    } else {
-      console.log('❌ Dados incompletos do formulário:', { city: !!city, state: !!state, zip: !!zip, zipLength: zip?.length });
+  console.log('🔍 Procurando dados pessoais no formulário...');
+  
+  // Mapeamento de possíveis nomes de campos para nome
+  const nameFields = ['name', 'nome', 'firstname', 'first_name', 'fn'];
+  // Mapeamento de possíveis nomes de campos para sobrenome
+  const lastNameFields = ['lastname', 'last_name', 'sobrenome', 'ln'];
+  // Mapeamento de possíveis nomes de campos para email
+  const emailFields = ['email', 'e-mail', 'mail', 'em'];
+  // Mapeamento de possíveis nomes de campos para telefone
+  const phoneFields = ['phone', 'telefone', 'celular', 'mobile', 'ph', 'whatsapp'];
+  
+  let fn = '';
+  let ln = '';
+  let em = '';
+  let ph = '';
+  
+  // Procurar campos de nome
+  for (const fieldName of nameFields) {
+    const input = document.querySelector(`input[name*="${fieldName}"], input[id*="${fieldName}"]`) as HTMLInputElement;
+    if (input && input.value.trim()) {
+      fn = input.value.trim();
+      console.log(`✅ Nome encontrado no campo "${fieldName}":`, fn);
+      break;
     }
-  } catch (error) {
-    console.warn('⚠️ Erro ao obter dados do formulário:', error);
   }
   
+  // Procurar campos de sobrenome
+  for (const fieldName of lastNameFields) {
+    const input = document.querySelector(`input[name*="${fieldName}"], input[id*="${fieldName}"]`) as HTMLInputElement;
+    if (input && input.value.trim()) {
+      ln = input.value.trim();
+      console.log(`✅ Sobrenome encontrado no campo "${fieldName}":`, ln);
+      break;
+    }
+  }
+  
+  // Procurar campos de email
+  for (const fieldName of emailFields) {
+    const input = document.querySelector(`input[name*="${fieldName}"], input[id*="${fieldName}"]`) as HTMLInputElement;
+    if (input && input.value.trim()) {
+      em = input.value.trim();
+      console.log(`✅ Email encontrado no campo "${fieldName}":`, em);
+      break;
+    }
+  }
+  
+  // Procurar campos de telefone
+  for (const fieldName of phoneFields) {
+    const input = document.querySelector(`input[name*="${fieldName}"], input[id*="${fieldName}"]`) as HTMLInputElement;
+    if (input && input.value.trim()) {
+      ph = input.value.trim();
+      console.log(`✅ Telefone encontrado no campo "${fieldName}":`, ph);
+      break;
+    }
+  }
+  
+  // Se encontrou pelo menos um dado pessoal, retornar o objeto
+  if (fn || ln || em || ph) {
+    console.log('🎯 Dados pessoais capturados do formulário:', { fn, ln, em, ph });
+    return {
+      fn: fn || '',
+      ln: ln || '',
+      em: em || '',
+      ph: ph || ''
+    };
+  }
+  
+  console.log('ℹ️ Nenhum dado pessoal encontrado no formulário');
   return null;
+}
+
+/**
+ * Obtém dados pessoais de ALTA QUALIDADE incluindo captura de dados do formulário
+ * @returns Promise com dados pessoais da melhor fonte disponível
+ */
+export async function getHighQualityLocationData(): Promise<{
+  fn: string;
+  ln: string;
+  em: string;
+  ph: string;
+}> {
+  // 1. Tentar obter dados do formulário (mais precisos se disponíveis)
+  const formData = getFormLocationData();
+  if (formData) {
+    console.log('🌍 Usando dados pessoais do formulário:', formData);
+    return formData;
+  }
+  
+  // 2. Retornar objeto vazio se não encontrar dados do formulário
+  console.log('ℹ️ Nenhum dado pessoal encontrado, retornando valores vazios');
+  return {
+    fn: '',
+    ln: '',
+    em: '',
+    ph: ''
+  };
 }
 
 /**
@@ -639,6 +669,8 @@ export default {
   getCookie,
   getFacebookCookies,
   getGoogleClientId,
+  getFormLocationData,
+  getHighQualityLocationData,
   getLocationData,
   getAllTrackingParams
 };
