@@ -42,7 +42,7 @@ export const META_CONFIG = {
     enableDataHashing: true,
     
     // Habilitar envio para Conversions API
-    enableConversionsAPI: true, // Mantenha false até configurar server-side
+    enableConversionsAPI: true, // Habilitado agora que o token está configurado
     
     // Campos obrigatórios para matching de alta qualidade
     requiredFields: ['email', 'phone', 'firstName', 'lastName'],
