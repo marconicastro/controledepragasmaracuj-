@@ -134,6 +134,25 @@ export default function AdvancedTracking() {
               country: 'BR'
             });
           },
+          // Funções de diagnóstico do token
+          checkTokenStatus: async () => {
+            console.log('🔍 Verificando status do token do Facebook...');
+            const status = await eventManager.forceTokenCheck();
+            console.log('📊 Status do token:', status);
+            return status;
+          },
+          diagnoseTokenIssues: async () => {
+            console.log('🔍 Diagnosticando problemas do token...');
+            const diagnosis = await eventManager.diagnoseTokenIssues();
+            console.log('📊 Diagnóstico:', diagnosis);
+            return diagnosis;
+          },
+          forceEnableServerSide: async () => {
+            console.log('🔄 Forçando reabilitação do server-side...');
+            const result = await eventManager.forceEnableServerSide();
+            console.log('📊 Resultado:', result ? '✅ Sucesso' : '❌ Falha');
+            return result;
+          },
           // Funções de depuração do EventManager
           getEventManagerStats: () => {
             return eventManager.getCacheStats();
@@ -176,6 +195,9 @@ declare global {
       trackCheckout: (userData: any) => Promise<void>;
       trackViewContentWithUserData: (userData: any) => Promise<void>;
       testCheckout: () => void;
+      checkTokenStatus: () => Promise<any>;
+      diagnoseTokenIssues: () => Promise<any>;
+      forceEnableServerSide: () => Promise<boolean>;
       getEventManagerStats: () => any;
       clearEventManagerCache: () => void;
       testEventManagerDeduplication: () => void;

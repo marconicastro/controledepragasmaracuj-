@@ -119,17 +119,18 @@ function logDetailedError(event_name: string, error: any, attempt: number) {
 }
 
 // Função para enviar evento para Facebook com retry
-async function sendEventToFacebook(eventData: any, maxRetries: number = 3): Promise<{ success: boolean; result?: any; error?: any }> {
-  const { event_name, pixel_id } = eventData;
+async function sendEventToFacebook(facebookEventData: any, maxRetries: number = 3): Promise<{ success: boolean; result?: any; error?: any }> {
+  const { event_name, pixel_id, data } = facebookEventData;
   
   try {
     const response = await retryWithBackoff(async () => {
+      // O Facebook API espera apenas o array 'data' no corpo da requisição
       const facebookResponse = await fetch(`https://graph.facebook.com/v23.0/${pixel_id}/events?access_token=${process.env.FACEBOOK_ACCESS_TOKEN}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(eventData.data)
+        body: JSON.stringify({ data: data })
       });
       
       if (!facebookResponse.ok) {
@@ -170,6 +171,20 @@ export async function POST(request: NextRequest) {
     // Extrair dados do evento
     const { event_name, event_id, pixel_id, user_data, custom_data } = body;
     
+    // CRÍTICO: Para eventos de conversão, garantir que event_id seja único para evitar desduplicação no Facebook
+    const conversionEvents = ['view_content', 'initiate_checkout', 'purchase', 'add_to_cart'];
+    const isConversionEvent = conversionEvents.includes(event_name);
+    
+    let finalEventId = event_id;
+    if (isConversionEvent) {
+      // Gerar um event_id único para eventos de conversão para evitar qualquer desduplicação
+      const timestamp = Date.now();
+      const random = Math.random().toString(36).substring(2, 15);
+      const nonce = Math.floor(Math.random() * 1000000);
+      finalEventId = `${event_name}_${timestamp}_${random}_${nonce}`;
+      console.log(`🎯 [${requestId}] EVENTO DE CONVERSÃO DETECTADO - EventID gerado: ${finalEventId}`);
+    }
+    
     // Preparar dados do usuário com hash SHA-256
     const hashedUserData = {
       // Dados do usuário com hash - OBRIGATÓRIO para Facebook
@@ -192,12 +207,12 @@ export async function POST(request: NextRequest) {
     
     // Preparar dados no formato EXATO que o Facebook API espera
     const facebookEventData = {
-      event_name,
-      event_id,
-      pixel_id,
+      event_name: event_name,
+      event_id: finalEventId, // Usar o event_id final (pode ser o original ou gerado)
+      pixel_id: pixel_id,
       data: [{
         event_name: event_name,
-        event_id: event_id,
+        event_id: finalEventId, // Usar o event_id final aqui também
         event_time: Math.floor(Date.now() / 1000),
         action_source: 'website',
         user_data: hashedUserData,
@@ -233,7 +248,7 @@ export async function POST(request: NextRequest) {
                 }],
         },
         event_source_url: request.headers.get('referer') || 'https://www.maracujazeropragas.com',
-        referrer_url: request.headers.get('referer') || 'https://www.maracujazeropragas.com',
+        referrer_url: request.headers.get('referer') || 'https://www.maracujazeropragas.com'
       }]
     };
     
@@ -249,6 +264,15 @@ export async function POST(request: NextRequest) {
       zp: user_data.zp ? `${user_data.zp} -> ${hashedUserData.zp}` : 'N/A',
       country: user_data.country ? `${user_data.country} -> ${hashedUserData.country}` : 'N/A',
     });
+    
+    // Log adicional para eventos de conversão
+    if (isConversionEvent) {
+      console.log(`🎯 [${requestId}] ENVIANDO EVENTO DE CONVERSÃO - EventID único: ${finalEventId}`);
+      console.log(`🎯 [${requestId}] Dados anti-desduplicação:`, {
+        event_processing_time: facebookEventData.data[0].event_processing_time,
+        deduplication_key: facebookEventData.data[0].deduplication_key
+      });
+    }
     
     // Enviar para Facebook Conversion API com retry
     const facebookResult = await sendEventToFacebook(facebookEventData, 3);
@@ -268,7 +292,7 @@ export async function POST(request: NextRequest) {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            eventId: body.event_id,
+            eventId: finalEventId, // Usar o event_id final
             eventName: body.event_name,
             status: 'success'
           })
@@ -286,7 +310,9 @@ export async function POST(request: NextRequest) {
         hashedData: hashedUserData,
         processingTime,
         requestId,
-        retryAttempts: 0
+        retryAttempts: 0,
+        isConversionEvent,
+        finalEventId // Retornar o event_id final usado
       });
     } else {
       const errorClassification = facebookResult.error.classification;
@@ -304,7 +330,9 @@ export async function POST(request: NextRequest) {
         processingTime,
         requestId,
         retryable: errorClassification.retryable,
-        errorType: errorClassification.type
+        errorType: errorClassification.type,
+        isConversionEvent,
+        finalEventId // Retornar o event_id final mesmo em caso de erro
       }, { status });
     }
     
