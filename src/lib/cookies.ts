@@ -770,6 +770,91 @@ export async function getAllTrackingParams(): Promise<{
   };
 }
 
+/**
+ * Salva dados pessoais no localStorage para uso futuro
+ * @param personalData Dados pessoais para salvar
+ */
+export function savePersonalDataToLocalStorage(personalData: {
+  fn: string;
+  ln: string;
+  em: string;
+  ph: string;
+}): void {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    localStorage.setItem('user_personal_data', JSON.stringify(personalData));
+    console.log('💾 Dados pessoais salvos no localStorage:', personalData);
+  } catch (error) {
+    console.error('❌ Erro ao salvar dados pessoais no localStorage:', error);
+  }
+}
+
+/**
+ * Obtém dados pessoais do localStorage
+ * @returns Dados pessoais salvos ou objeto vazio
+ */
+export function getPersonalDataFromLocalStorage(): {
+  fn: string;
+  ln: string;
+  em: string;
+  ph: string;
+} {
+  if (typeof window === 'undefined') {
+    return { fn: '', ln: '', em: '', ph: '' };
+  }
+  
+  try {
+    const stored = localStorage.getItem('user_personal_data');
+    if (stored) {
+      const personalData = JSON.parse(stored);
+      console.log('📂 Dados pessoais recuperados do localStorage:', personalData);
+      return personalData;
+    }
+  } catch (error) {
+    console.error('❌ Erro ao recuperar dados pessoais do localStorage:', error);
+  }
+  
+  return { fn: '', ln: '', em: '', ph: '' };
+}
+
+/**
+ * Obtém dados pessoais de ALTA QUALIDADE com múltiplas fontes
+ * Prioridade: Formulário > localStorage > Vazio
+ * @returns Promise com dados pessoais da melhor fonte disponível
+ */
+export async function getEnhancedPersonalData(): Promise<{
+  fn: string;
+  ln: string;
+  em: string;
+  ph: string;
+}> {
+  // 1. Tentar obter dados do formulário (mais precisos se disponíveis)
+  const formData = getFormPersonalData();
+  if (formData && (formData.fn || formData.ln || formData.em || formData.ph)) {
+    console.log('🌍 Usando dados pessoais do formulário:', formData);
+    // Salvar no localStorage para uso futuro
+    savePersonalDataToLocalStorage(formData);
+    return formData;
+  }
+  
+  // 2. Tentar obter dados do localStorage
+  const localStorageData = getPersonalDataFromLocalStorage();
+  if (localStorageData.fn || localStorageData.ln || localStorageData.em || localStorageData.ph) {
+    console.log('📂 Usando dados pessoais do localStorage:', localStorageData);
+    return localStorageData;
+  }
+  
+  // 3. Retornar objeto vazio se não encontrar dados
+  console.log('ℹ️ Nenhum dado pessoal encontrado, retornando valores vazios');
+  return {
+    fn: '',
+    ln: '',
+    em: '',
+    ph: ''
+  };
+}
+
 export default {
   getCookie,
   getFacebookCookies,
@@ -778,6 +863,17 @@ export default {
   getHighQualityPersonalData,
   getFormLocationData,
   getHighQualityLocationData,
+  savePersonalDataToLocalStorage,
+  getPersonalDataFromLocalStorage,
+  getEnhancedPersonalData,
   getLocationData,
-  getAllTrackingParams
+  getCachedGeographicData,
+  validateDataQuality,
+  getAllTrackingParams,
+  captureFbclid,
+  captureUTMParameters,
+  getStoredUTMParameters,
+  addUTMHiddenFields,
+  buildURLWithUTM,
+  initializeTracking
 };

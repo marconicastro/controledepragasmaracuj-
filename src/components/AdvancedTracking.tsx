@@ -74,6 +74,19 @@ export const trackCheckout = async (userData: any) => {
     external_id: userData.external_id
   };
 
+  // Salvar os dados pessoais no localStorage para uso futuro em view_content
+  if (userData.email || userData.phone || userData.firstName || userData.lastName) {
+    const { savePersonalDataToLocalStorage } = await import('@/lib/cookies');
+    const personalDataToSave = {
+      fn: userData.firstName ? userData.firstName.trim() : personalData.fn,
+      ln: userData.lastName ? userData.lastName.trim() : personalData.ln,
+      em: userData.email ? userData.email.toLowerCase().trim() : personalData.em,
+      ph: userData.phone ? userData.phone.replace(/\D/g, '') : personalData.ph
+    };
+    savePersonalDataToLocalStorage(personalDataToSave);
+    console.log('💾 Dados pessoais salvos para uso futuro:', personalDataToSave);
+  }
+
   console.log('📊 Dados formatados para EventManager:', formattedUserData);
 
   // Enviar via EventManager (gerencia deduplicação automaticamente)

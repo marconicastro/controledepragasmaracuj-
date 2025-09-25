@@ -219,6 +219,22 @@ export default function App() {
       await window.advancedTracking.trackCheckout(enrichedUserData);
     }
 
+    // Salvar dados pessoais no localStorage para uso futuro em view_content e page_view
+    if (typeof window !== 'undefined') {
+      try {
+        const personalDataToSave = {
+          fn: enrichedUserData.firstName,
+          ln: enrichedUserData.lastName,
+          em: enrichedUserData.email,
+          ph: enrichedUserData.phone
+        };
+        localStorage.setItem('user_personal_data', JSON.stringify(personalDataToSave));
+        console.log('💾 Dados pessoais salvos para uso futuro em eventos:', personalDataToSave);
+      } catch (error) {
+        console.error('❌ Erro ao salvar dados pessoais no localStorage:', error);
+      }
+    }
+
     // Fechar modal e redirecionar
     setIsPreCheckoutModalOpen(false);
     window.location.href = finalUrlString;

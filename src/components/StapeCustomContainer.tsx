@@ -133,10 +133,10 @@ export default function StapeCustomContainer({ gtmId = 'GTM-567XZCDX' }: StapeCu
         setTimeout(async () => {
           console.log('🎯 Enviando ViewContent via EventManager (integrado do AdvancedTracking)...');
           
-          // Obter dados de localização e pessoais de alta qualidade
-          const { getHighQualityLocationData, getHighQualityPersonalData } = await import('@/lib/cookies');
+          // Obter dados de localização e pessoais de alta qualidade com múltiplas fontes
+          const { getHighQualityLocationData, getEnhancedPersonalData } = await import('@/lib/cookies');
           const locationData = await getHighQualityLocationData();
-          const personalData = await getHighQualityPersonalData();
+          const personalData = await getEnhancedPersonalData(); // Usar a nova função enhanced
           
           // Preparar dados do usuário formatados
           const viewContentUserData = {
@@ -153,6 +153,13 @@ export default function StapeCustomContainer({ gtmId = 'GTM-567XZCDX' }: StapeCu
             ga_client_id: trackingParams.ga_client_id,
             external_id: trackingParams.external_id
           };
+          
+          console.log('📊 Dados pessoais para ViewContent:', {
+            em: personalData.em ? '✅ Presente' : '❌ Ausente',
+            ph: personalData.ph ? '✅ Presente' : '❌ Ausente',
+            fn: personalData.fn ? '✅ Presente' : '❌ Ausente',
+            ln: personalData.ln ? '✅ Presente' : '❌ Ausente'
+          });
           
           // Enviar ViewContent via EventManager
           const viewContentResult = await eventManager.sendViewContent(viewContentUserData);

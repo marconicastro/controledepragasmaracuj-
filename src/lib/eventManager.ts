@@ -67,8 +67,17 @@ class EventManager {
 
   /**
    * Verifica se evento já foi enviado recentemente
+   * NOTA: Eventos de conversão (view_content, initiate_checkout) NÃO devem ser desduplicados
    */
   private isEventDuplicate(eventName: string, userData: any): boolean {
+    // Eventos de conversão NUNCA devem ser desduplicados
+    const conversionEvents = ['view_content', 'initiate_checkout', 'purchase', 'add_to_cart'];
+    if (conversionEvents.includes(eventName)) {
+      console.log(`🎯 Evento de conversão ${eventName} - pulando verificação de duplicação`);
+      return false;
+    }
+
+    // Para outros eventos, aplicar lógica de desduplicação normal
     const now = Date.now();
     
     // Verificar por evento + email (identificador único do usuário)
