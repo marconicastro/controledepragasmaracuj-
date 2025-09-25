@@ -7,11 +7,7 @@
  * 3. Implementa cache compartilhado com expiração adequada
  * 4. Coordena envio entre múltiplos canais
  * 5. Previne envios duplicados com sistema robusto de deduplicação
- * 6. Implementa verificação de status do token do Facebook
- * 7. Adiciona fallback quando o token não está funcionando
  */
-
-import { checkFacebookTokenStatus } from '@/lib/facebookTokenStatus';
 
 interface EventRecord {
   eventId: string;
@@ -30,23 +26,11 @@ interface EventConfig {
   retryAttempts: number;
 }
 
-// Interface para status do token
-interface TokenStatus {
-  isValid: boolean;
-  lastChecked: number;
-  error?: string;
-}
-
 class EventManager {
   private static instance: EventManager;
   private eventCache: Map<string, EventRecord> = new Map();
   private processingEvents: Set<string> = new Set();
   private config: EventConfig;
-  private tokenStatus: TokenStatus = {
-    isValid: true, // Assumir válido inicialmente
-    lastChecked: 0
-  };
-  private tokenCheckInProgress = false;
 
   private constructor() {
     this.config = {
@@ -60,9 +44,6 @@ class EventManager {
     // Limpar cache periodicamente
     setInterval(() => this.cleanupCache(), 60000); // Limpar a cada minuto
     
-    // Verificar status do token periodicamente (a cada 10 minutos)
-    setInterval(() => this.checkTokenStatus(), 10 * 60 * 1000);
-    
     console.log('🎯 EventManager inicializado com configuração:', this.config);
   }
 
@@ -74,88 +55,12 @@ class EventManager {
   }
 
   /**
-   * Verifica o status do token do Facebook
-   */
-  private async checkTokenStatus(): Promise<void> {
-    // Evitar verificações concorrentes
-    if (this.tokenCheckInProgress) {
-      return;
-    }
-    
-    // Verificar se já verificamos recentemente (menos de 5 minutos)
-    if (Date.now() - this.tokenStatus.lastChecked < 5 * 60 * 1000) {
-      return;
-    }
-    
-    this.tokenCheckInProgress = true;
-    
-    try {
-      console.log('🔍 Verificando status do token do Facebook...');
-      const status = await checkFacebookTokenStatus();
-      
-      this.tokenStatus = {
-        isValid: status.isValid,
-        lastChecked: Date.now(),
-        error: status.error
-      };
-      
-      if (status.isValid) {
-        console.log('✅ Token do Facebook está válido');
-        // Reabilitar server-side se estava desabilitado
-        this.config.enableServerSide = true;
-      } else {
-        console.error('❌ Token do Facebook está inválido:', status.error);
-        // Desabilitar server-side para evitar erros
-        this.config.enableServerSide = false;
-        console.warn('⚠️ Server-side desabilitado devido ao token inválido');
-      }
-      
-    } catch (error) {
-      console.error('❌ Erro ao verificar status do token:', error);
-      this.tokenStatus = {
-        isValid: false,
-        lastChecked: Date.now(),
-        error: error.message
-      };
-      // Desabilitar server-side em caso de erro
-      this.config.enableServerSide = false;
-    } finally {
-      this.tokenCheckInProgress = false;
-    }
-  }
-
-  /**
-   * Obtém o status atual do token
-   */
-  public getTokenStatus(): TokenStatus {
-    return { ...this.tokenStatus };
-  }
-
-  /**
-   * Força uma verificação imediata do token
-   */
-  public async forceTokenCheck(): Promise<TokenStatus> {
-    await this.checkTokenStatus();
-    return this.getTokenStatus();
-  }
-
-  /**
    * Gera event_id único e consistente
    * Formato: {eventName}_{timestamp}_{random}_{channel}
-   * CRÍTICO: Para eventos de conversão, incluir um nonce único para evitar desduplicação no Facebook
    */
   private generateEventId(eventName: string, channel: 'client' | 'server' | 'gtm'): string {
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(2, 15);
-    
-    // Para eventos de conversão, adicionar um nonce extra para garantir unicidade absoluta
-    const conversionEvents = ['view_content', 'initiate_checkout', 'purchase', 'add_to_cart'];
-    if (conversionEvents.includes(eventName)) {
-      const nonce = Math.floor(Math.random() * 1000000);
-      const uniqueId = Math.random().toString(36).substring(2, 15);
-      return `${eventName}_${timestamp}_${random}_${nonce}_${uniqueId}_${channel}`;
-    }
-    
     const nonce = Math.floor(Math.random() * 1000000);
     return `${eventName}_${timestamp}_${random}_${nonce}_${channel}`;
   }
@@ -163,13 +68,12 @@ class EventManager {
   /**
    * Verifica se evento já foi enviado recentemente
    * NOTA: Eventos de conversão (view_content, initiate_checkout) NÃO devem ser desduplicados
-   * CRÍTICO: Para eventos de conversão, sempre retornar false para evitar qualquer desduplicação
    */
   private isEventDuplicate(eventName: string, userData: any): boolean {
-    // Eventos de conversão NUNCA devem ser desduplicados - nunca, nunca, nunca!
+    // Eventos de conversão NUNCA devem ser desduplicados
     const conversionEvents = ['view_content', 'initiate_checkout', 'purchase', 'add_to_cart'];
     if (conversionEvents.includes(eventName)) {
-      console.log(`🎯 EVENTO DE CONVERSÃO ${eventName} - IGNORANDO COMPLETAMENTE A VERIFICAÇÃO DE DUPLICAÇÃO`);
+      console.log(`🎯 Evento de conversão ${eventName} - pulando verificação de duplicação`);
       return false;
     }
 
@@ -286,17 +190,9 @@ class EventManager {
 
   /**
    * Envia evento via Server-side (API)
-   * CRÍTICO: Verificar status do token antes de enviar
    */
   private async sendServerSide(eventId: string, eventName: string, data: any): Promise<boolean> {
     if (!this.config.enableServerSide) {
-      console.log(`🚫 Server-side desabilitado para evento ${eventName}`);
-      return false;
-    }
-
-    // Verificar status do token antes de enviar
-    if (!this.tokenStatus.isValid) {
-      console.warn(`⚠️ Token inválido, pulando envio server-side para evento ${eventName}`);
       return false;
     }
 
@@ -328,19 +224,6 @@ class EventManager {
       } else {
         const error = await response.json();
         console.error(`❌ Erro ao enviar evento server-side ${eventName}:`, error);
-        
-        // Se for erro de autenticação, verificar o token
-        if (error.error?.code === 190) {
-          console.warn('🔄 Erro de autenticação detectado, verificando token...');
-          this.tokenStatus.isValid = false;
-          this.tokenStatus.lastChecked = Date.now();
-          this.tokenStatus.error = error.error.message;
-          this.config.enableServerSide = false;
-          
-          // Iniciar verificação assíncrona do token
-          this.checkTokenStatus();
-        }
-        
         return false;
       }
     } catch (error) {
@@ -351,8 +234,6 @@ class EventManager {
 
   /**
    * Método principal para enviar eventos
-   * CRÍTICO: Para eventos de conversão, gerar event_ids únicos a cada envio para evitar desduplicação no Facebook
-   * ADICIONADO: Verificação de status do token e fallback para client-side quando token está inválido
    */
   public async sendEvent(
     eventName: string,
@@ -368,32 +249,11 @@ class EventManager {
     console.group(`🎯 EventManager - ${eventName}`);
     
     try {
-      // CRÍTICO: Eventos de conversão nunca devem ser desduplicados, nem mesmo com skipDeduplication=false
-      const conversionEvents = ['view_content', 'initiate_checkout', 'purchase', 'add_to_cart'];
-      const isConversionEvent = conversionEvents.includes(eventName);
-      
-      // Verificar duplicação (a menos que seja forçado ou evento de conversão)
-      if (!skipDeduplication && !forceClient && !forceServer && !isConversionEvent) {
+      // Verificar duplicação (a menos que seja forçado)
+      if (!skipDeduplication && !forceClient && !forceServer) {
         if (this.isEventDuplicate(eventName, data.user_data || {})) {
           console.warn(`⚠️ Evento ${eventName} ignorado por duplicação`);
           return { success: false, eventId: '', channels: [] };
-        }
-      }
-      
-      // Se for evento de conversão, logar explicitamente que estamos ignorando desduplicação
-      if (isConversionEvent) {
-        console.log(`🎯 EVENTO DE CONVERSÃO ${eventName} - ENVIANDO SEM VERIFICAÇÃO DE DUPLICAÇÃO`);
-      }
-
-      // Verificar status do token antes de decidir estratégia de envio
-      const tokenStatus = this.getTokenStatus();
-      const isTokenValid = tokenStatus.isValid;
-      
-      if (!isTokenValid && !forceClient) {
-        console.warn(`⚠️ Token inválido detectado, ajustando estratégia de envio para evento ${eventName}`);
-        // Se token estiver inválido e não forçado client-side, forçar client-side como fallback
-        if (!forceServer) {
-          console.log(`🔄 Forçando client-side para evento ${eventName} devido ao token inválido`);
         }
       }
 
@@ -401,31 +261,18 @@ class EventManager {
       const channels: string[] = [];
       const results: boolean[] = [];
 
-      // Estratégia de envio baseada na configuração e status do token
-      if (forceClient || (this.config.enableClientSide && !forceServer) || !isTokenValid) {
-        // Para eventos de conversão, gerar event_id único a cada vez
-        const clientEventId = isConversionEvent 
-          ? this.generateEventId(eventName, 'client')
-          : this.generateEventId(eventName, 'client');
-        
+      // Estratégia de envio baseada na configuração
+      if (forceClient || (this.config.enableClientSide && !forceServer)) {
+        const clientEventId = this.generateEventId(eventName, 'client');
         this.registerEvent(clientEventId, eventName, 'client', data);
         
         const clientResult = await this.sendClientSide(clientEventId, eventName, data);
         results.push(clientResult);
         channels.push('client');
-        
-        if (!isTokenValid) {
-          console.log(`✅ Evento ${eventName} enviado via client-side (fallback devido ao token inválido)`);
-        }
       }
 
-      // Tentar server-side apenas se token estiver válido e não forçado client-side
-      if (isTokenValid && (forceServer || (this.config.enableServerSide && !forceClient))) {
-        // Para eventos de conversão, gerar event_id único a cada vez (diferente do client-side)
-        const serverEventId = isConversionEvent 
-          ? this.generateEventId(eventName, 'server')
-          : this.generateEventId(eventName, 'server');
-        
+      if (forceServer || (this.config.enableServerSide && !forceClient)) {
+        const serverEventId = this.generateEventId(eventName, 'server');
         this.registerEvent(serverEventId, eventName, 'server', data);
         
         const serverResult = await this.sendServerSide(serverEventId, eventName, data);
@@ -440,10 +287,7 @@ class EventManager {
         channels,
         results,
         totalAttempts: results.length,
-        successfulAttempts: results.filter(r => r).length,
-        isConversionEvent,
-        tokenStatus: isTokenValid ? '✅ Válido' : '❌ Inválido',
-        fallbackUsed: !isTokenValid && channels.includes('client')
+        successfulAttempts: results.filter(r => r).length
       });
 
       return { success, eventId: channels.join('_'), channels };
@@ -536,66 +380,6 @@ class EventManager {
   public updateConfig(newConfig: Partial<EventConfig>): void {
     this.config = { ...this.config, ...newConfig };
     console.log('⚙️ Configuração do EventManager atualizada:', this.config);
-  }
-
-  /**
-   * Métodos de diagnóstico e status do token
-   */
-  public async diagnoseTokenIssues(): Promise<{
-    tokenStatus: TokenStatus;
-    serverSideEnabled: boolean;
-    clientSideEnabled: boolean;
-    recommendations: string[];
-  }> {
-    const tokenStatus = this.getTokenStatus();
-    const recommendations: string[] = [];
-    
-    if (!tokenStatus.isValid) {
-      recommendations.push('❌ Token do Facebook está inválido ou expirado');
-      recommendations.push('🔧 Verifique a variável de ambiente FACEBOOK_ACCESS_TOKEN');
-      recommendations.push('📝 Gere um novo token no Facebook Developers');
-      recommendations.push('🔄 Use forceTokenCheck() para verificar novamente');
-    } else {
-      recommendations.push('✅ Token do Facebook está válido');
-    }
-    
-    if (!this.config.enableServerSide) {
-      recommendations.push('⚠️ Server-side está desabilitado');
-      if (tokenStatus.isValid) {
-        recommendations.push('🔄 Considere reabilitar server-side para melhor rastreamento');
-      }
-    }
-    
-    if (!this.config.enableClientSide) {
-      recommendations.push('⚠️ Client-side está desabilitado');
-      recommendations.push('🔄 Considere habilitar client-side como fallback');
-    }
-    
-    return {
-      tokenStatus,
-      serverSideEnabled: this.config.enableServerSide,
-      clientSideEnabled: this.config.enableClientSide,
-      recommendations
-    };
-  }
-
-  /**
-   * Força reabilitação do server-side (útil após corrigir o token)
-   */
-  public async forceEnableServerSide(): Promise<boolean> {
-    console.log('🔄 Forçando reabilitação do server-side...');
-    
-    // Verificar token primeiro
-    await this.forceTokenCheck();
-    
-    if (this.tokenStatus.isValid) {
-      this.config.enableServerSide = true;
-      console.log('✅ Server-side reabilitado com sucesso');
-      return true;
-    } else {
-      console.error('❌ Não foi possível reabilitar server-side - token ainda inválido');
-      return false;
-    }
   }
 }
 
