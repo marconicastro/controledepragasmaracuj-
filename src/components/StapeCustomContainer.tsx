@@ -246,7 +246,7 @@ export default function StapeCustomContainer({ gtmId = 'GTM-567XZCDX' }: StapeCu
       <script
         dangerouslySetInnerHTML={{
           __html: `
-            (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s);j.async=true;j.src="https://data.maracujazeropragas.com/aqffwhuqxv.js?"+i;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','b6oj=HxxMMjw6S1NATykvKzM%2BQABFQ1tZUQIISxUQBwkUEwwXAhQHBwcUBxEZAlsLGAs%3D');
+            (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s);j.async=true;j.src="https://data.maracujazeropragas.com/24rckptuywp.js?"+i;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','4n13l=GRNEMiA9RlZGQCEvNzQzRQZKS1tFVg8NTRoYBxUTHgkRDRwHGwAZAhcWClsXHwY%3D');
           `,
         }}
       />
