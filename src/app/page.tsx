@@ -3,19 +3,13 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, X, AlertTriangle, Clock, Shield, Star, Rocket, Phone, Mail, TrendingUp, Target, Zap, Award, Users, DollarSign, ArrowRight, PlayCircle, Download } from 'lucide-react';
-import PreCheckoutModal from '@/components/PreCheckoutModal';
-import { getFacebookCookies, getGoogleClientId, buildURLWithUTM, getStoredUTMParameters } from '@/lib/cookies';
-import META_CONFIG from '@/lib/metaConfig';
 
-export default function App() {
+function App() {
   const [timeLeft, setTimeLeft] = useState({
     hours: 0,
     minutes: 47,
     seconds: 0
   });
-
-  // Estado para controlar o modal de pré-checkout
-  const [isPreCheckoutModalOpen, setIsPreCheckoutModalOpen] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -34,220 +28,8 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // Função para abrir o modal de pré-checkout
-  const openPreCheckoutModal = (event) => {
-    event.preventDefault();
-    setIsPreCheckoutModalOpen(true);
-  };
-
-  // Função para processar os dados do pré-checkout e redirecionar
-  const handlePreCheckoutSubmit = async (formData) => {
-    console.log('🚀 Dados recebidos do formulário:', formData);
-    
-    // Garantir que o nome completo esteja limpo e formatado corretamente
-    const cleanFullName = formData.fullName
-      .trim()
-      .replace(/\s+/g, ' ') // Remove espaços extras
-      .replace(/[^a-zA-ZÀ-ÿ\s'-]/g, '') // Remove caracteres inválidos
-      .replace(/^-+|-+$/g, '') // Remove hífens do início/fim
-      .replace(/^'+|'+$/g, ''); // Remove apóstrofos do início/fim
-    
-    console.log('Nome limpo:', cleanFullName);
-    console.log('Email:', formData.email);
-    console.log('Telefone:', formData.phone);
-
-    // Capturar cookies necessários usando os utilitários
-    const { fbc, fbp } = getFacebookCookies();
-    const clientId = getGoogleClientId();
-    
-    // Capturar parâmetros UTM armazenados
-    const utmParams = getStoredUTMParameters();
-    console.log('📊 Parâmetros UTM capturados:', utmParams);
-
-    // Construir parâmetros adicionais para o checkout
-    const additionalParams: Record<string, string> = {};
-    
-    // 1. Parâmetros de Rastreamento (Manter)
-    if (clientId) {
-      additionalParams['cid'] = clientId;
-    }
-
-    // Montar parâmetros de rastreamento da Meta (sck)
-    const sckParams = new URLSearchParams();
-    if (fbp) {
-      sckParams.set('_fbp', fbp);
-    }
-    if (fbc) {
-      sckParams.set('_fbc', fbc);
-    }
-    const sckValue = sckParams.toString();
-    if (sckValue) {
-      additionalParams['sck'] = sckValue;
-    }
-
-    // 2. Parâmetros de Pré-preenchimento
-    additionalParams['name'] = cleanFullName;
-    additionalParams['email'] = formData.email;
-    
-    // Para o Telefone: Formato esperado pela máscara "99 99999-9999"
-    const phoneClean = formData.phone.replace(/\D/g, '');
-    console.log('Telefone limpo:', phoneClean);
-    
-    if (phoneClean.length >= 10 && phoneClean.length <= 11) {
-      // Extrair DDD e número
-      const ddd = phoneClean.substring(0, 2);
-      const numeroCompleto = phoneClean.substring(2);
-      
-      console.log('DDD:', ddd);
-      console.log('Número completo:', numeroCompleto);
-      
-      // Formatar para o padrão da máscara: "77 99827-6042"
-      if (numeroCompleto.length === 9) {
-        // Celular com 9: 998276042 -> 77 99827-6042
-        const primeiraParte = numeroCompleto.substring(0, 5); // 99827
-        const segundaParte = numeroCompleto.substring(5); // 6042
-        const numeroFormatado = `${ddd} ${primeiraParte}-${segundaParte}`;
-        
-        console.log('Número formatado:', numeroFormatado);
-        additionalParams['phone_number'] = numeroFormatado;
-      } else if (numeroCompleto.length === 8) {
-        // Fixo: 98276042 -> 77 9827-6042
-        const primeiraParte = numeroCompleto.substring(0, 4); // 9827
-        const segundaParte = numeroCompleto.substring(4); // 6042
-        const numeroFormatado = `${ddd} ${primeiraParte}-${segundaParte}`;
-        
-        console.log('Número formatado:', numeroFormatado);
-        additionalParams['phone_number'] = numeroFormatado;
-      } else {
-        // Fallback: enviar DDD + número sem formatação
-        const numeroFormatado = `${ddd} ${numeroCompleto}`;
-        additionalParams['phone_number'] = numeroFormatado;
-      }
-    }
-
-    // 3. Parâmetros adicionais
-    if (formData.city && formData.city.trim() !== '') {
-      additionalParams['city'] = formData.city.trim();
-    }
-    
-    if (formData.state && formData.state.trim() !== '') {
-      additionalParams['state'] = formData.state.trim();
-    }
-    
-    if (formData.cep && formData.cep.replace(/\D/g, '').length === 8) {
-      const cleanCEP = formData.cep.replace(/\D/g, '');
-      additionalParams['zip'] = cleanCEP;
-    }
-
-    // Usar a função buildURLWithUTM para construir a URL final com todos os parâmetros
-    const finalUrlString = buildURLWithUTM(META_CONFIG.HOTMART.checkoutUrl, additionalParams);
-
-    // Log para depuração
-    console.log('=== URL FINAL COMPLETA COM UTM ===');
-    console.log('URL:', finalUrlString);
-    
-    // Parse da URL para log detalhado
-    const finalUrl = new URL(finalUrlString);
-    console.log('Parâmetros:');
-    finalUrl.searchParams.forEach((value, key) => {
-      console.log(`${key}:`, value);
-    });
-
-    // Enriquecer dados do usuário para melhor rastreamento
-    const userData = {
-      email: formData.email,
-      phone: formData.phone.replace(/\D/g, ''),
-      firstName: formData.fullName.split(' ')[0] || '',
-      lastName: formData.fullName.split(' ').slice(1).join(' ') || '',
-      city: formData.city,
-      state: formData.state,
-      zip: formData.cep.replace(/\D/g, '')
-    };
-
-    // Obter dados de localização de alta qualidade para incluir no rastreamento
-    let locationData = {
-      city: formData.city,
-      state: formData.state,
-      zip: formData.cep.replace(/\D/g, ''),
-      country: 'BR'
-    };
-
-    const enrichedUserData = {
-      ...userData,
-      ...locationData, // Incluir dados geográficos!
-      fbc: fbc,
-      fbp: fbp,
-      ga_client_id: clientId,
-      external_id: formData.email ? formData.email.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() : undefined,
-      // Incluir UTM parameters para rastreamento
-      utm_source: utmParams.utm_source,
-      utm_medium: utmParams.utm_medium,
-      utm_campaign: utmParams.utm_campaign,
-      utm_content: utmParams.utm_content,
-      utm_term: utmParams.utm_term
-    };
-
-    console.log('📊 Dados do usuário enriquecidos para Meta:', enrichedUserData);
-    console.log('🌍 Dados geográficos incluídos:', {
-      city: enrichedUserData.city,
-      state: enrichedUserData.state,
-      zip: enrichedUserData.zip,
-      country: enrichedUserData.country
-    });
-    console.log('📧 Dados de contato:', {
-      email: enrichedUserData.email,
-      phone: enrichedUserData.phone,
-      firstName: enrichedUserData.firstName,
-      lastName: enrichedUserData.lastName
-    });
-    console.log('🔑 Dados de rastreamento:', {
-      fbc: enrichedUserData.fbc,
-      fbp: enrichedUserData.fbp,
-      ga_client_id: enrichedUserData.ga_client_id,
-      external_id: enrichedUserData.external_id
-    });
-    console.log('📊 Dados de UTM incluídos:', {
-      utm_source: enrichedUserData.utm_source,
-      utm_medium: enrichedUserData.utm_medium,
-      utm_campaign: enrichedUserData.utm_campaign,
-      utm_content: enrichedUserData.utm_content,
-      utm_term: enrichedUserData.utm_term
-    });
-
-    // Disparar evento de checkout com dados do usuário enriquecidos
-    if (typeof window !== 'undefined' && window.advancedTracking) {
-      await window.advancedTracking.trackCheckout(enrichedUserData);
-    }
-
-    // Salvar dados pessoais no localStorage para uso futuro em view_content e page_view
-    if (typeof window !== 'undefined') {
-      try {
-        const personalDataToSave = {
-          fn: enrichedUserData.firstName,
-          ln: enrichedUserData.lastName,
-          em: enrichedUserData.email,
-          ph: enrichedUserData.phone
-        };
-        localStorage.setItem('user_personal_data', JSON.stringify(personalDataToSave));
-        console.log('💾 Dados pessoais salvos para uso futuro em eventos:', personalDataToSave);
-      } catch (error) {
-        console.error('❌ Erro ao salvar dados pessoais no localStorage:', error);
-      }
-    }
-
-    // Fechar modal e redirecionar
-    setIsPreCheckoutModalOpen(false);
-    window.location.href = finalUrlString;
-  };
-
   const scrollToCheckout = () => {
     document.getElementById('checkout').scrollIntoView({ behavior: 'smooth' });
-  };
-
-  // Função principal de checkout (LEGADO - mantida para compatibilidade)
-  const handleHotmartCheckout = (event) => {
-    // Redirecionar para o novo fluxo com modal
-    openPreCheckoutModal(event);
   };
 
   return (
@@ -351,8 +133,6 @@ export default function App() {
               </div>
               <div className="text-xs sm:text-sm mt-2">💳 Ou 12x de R$ 3,99 sem juros</div>
             </div>
-            
-  
           </div>
         </div>
       </div>
@@ -523,7 +303,7 @@ export default function App() {
                     <div className="bg-green-500 text-white w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-sm sm:text-base">1</div>
                     <h4 className="font-bold text-green-700 text-sm sm:text-base">FASE OVOS (Dias 1-7)</h4>
                   </div>
-                  <p className="text-xs sm:text-sm text-gray-700">Eliminação dos ovos antes da eclosão com produto ovicida específico</p>
+                  <p className="text-xs sm:text-sm text-gray-700">Produto específico que penetra nos tecidos e elimina ovos antes da eclosão</p>
                 </div>
 
                 {/* Fase 2 */}
@@ -630,11 +410,11 @@ export default function App() {
                   </div>
                 </div>
                 <p className="text-gray-700 italic mb-3 sm:mb-4 text-xs sm:text-sm">
-                  "Economizei R$ 73.500 em defensivos! O trips sumiu em 21 dias e não voltou mais. 
-                  Minha produção aumentou 89% na safra seguinte."
+                  "Em 28 dias eliminei o trips que me atormentava há 3 anos. Economizei R$ 8.000 
+                  só na primeira safra e minha produção aumentou 73%!"
                 </p>
                 <div className="bg-green-100 p-2 sm:p-3 rounded text-green-800 font-semibold text-xs sm:text-sm">
-                  💰 Economia: R$ 73.500 | 📈 Aumento: 89%
+                  💰 Economia: R$ 8.000 | 📈 Aumento: 73%
                 </div>
               </div>
 
@@ -642,11 +422,11 @@ export default function App() {
               <div className="bg-white p-4 sm:p-6 rounded-lg shadow-lg border-2 border-blue-200">
                 <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
                   <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-sm sm:text-base">
-                    MS
+                    AS
                   </div>
                   <div>
-                    <h4 className="font-bold text-gray-800 text-sm sm:text-base">Maria Silva</h4>
-                    <p className="text-gray-600 text-xs sm:text-sm">8 hectares - Ceará</p>
+                    <h4 className="font-bold text-gray-800 text-sm sm:text-base">Ana Santos</h4>
+                    <p className="text-gray-600 text-xs sm:text-sm">8 hectares - São Paulo</p>
                   </div>
                   <div className="flex text-yellow-400 ml-auto">
                     {[...Array(5)].map((_, i) => (
@@ -655,11 +435,11 @@ export default function App() {
                   </div>
                 </div>
                 <p className="text-gray-700 italic mb-3 sm:mb-4 text-xs sm:text-sm">
-                  "Estava gastando R$ 1.200 por hectare com trips. Agora gasto R$ 180 e tenho 
-                  controle total. Lucro líquido subiu R$ 8.160!"
+                  "Estava gastando R$ 1.500/mês em defensivos sem resultado. Com o sistema, 
+                  gasto R$ 300 e tenho controle total. Frutos perfeitos!"
                 </p>
                 <div className="bg-blue-100 p-2 sm:p-3 rounded text-blue-800 font-semibold text-xs sm:text-sm">
-                  💰 Economia mensal: R$ 8.160 | 🎯 Controle: 100%
+                  💰 Economia: R$ 14.400/ano | 🎯 Controle: 100%
                 </div>
               </div>
 
@@ -667,11 +447,11 @@ export default function App() {
               <div className="bg-white p-4 sm:p-6 rounded-lg shadow-lg border-2 border-purple-200">
                 <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
                   <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold text-sm sm:text-base">
-                    AS
+                    CR
                   </div>
                   <div>
-                    <h4 className="font-bold text-gray-800 text-sm sm:text-base">Antônio Santos</h4>
-                    <p className="text-gray-600 text-xs sm:text-sm">22 hectares - Pernambuco</p>
+                    <h4 className="font-bold text-gray-800 text-sm sm:text-base">Carlos Ribeiro</h4>
+                    <p className="text-gray-600 text-xs sm:text-sm">25 hectares - Minas Gerais</p>
                   </div>
                   <div className="flex text-yellow-400 ml-auto">
                     {[...Array(5)].map((_, i) => (
@@ -809,8 +589,6 @@ export default function App() {
                   href="https://pay.hotmart.com/I101398692S" 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  id="botao-compra-hotmart" 
-                  onClick={handleHotmartCheckout}
                   className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-4 sm:py-6 px-4 sm:px-6 rounded-lg text-base sm:text-xl transform hover:scale-105 transition-all duration-200 shadow-2xl inline-flex items-center justify-center gap-2 sm:gap-3"
                 >
                   <DollarSign className="w-4 h-4 sm:w-6 sm:h-6" />
@@ -874,13 +652,8 @@ export default function App() {
           </div>
         </div>
       </div>
-      
-      {/* Modal de Pré-Checkout */}
-      <PreCheckoutModal
-        isOpen={isPreCheckoutModalOpen}
-        onClose={() => setIsPreCheckoutModalOpen(false)}
-        onSubmit={handlePreCheckoutSubmit}
-      />
     </div>
   );
 }
+
+export default App;

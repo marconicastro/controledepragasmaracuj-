@@ -10,5 +10,176 @@ Allow: /
 User-agent: facebookexternalhit
 Allow: /
 
-User-agent: *
+User-agent: WhatsApp
 Allow: /
+
+User-agent: *
+Disallow: /
+
+# Bloquear bots comuns de scraping
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: DotBot
+Disallow: /
+
+User-agent: Baiduspider
+Disallow: /
+
+User-agent: YandexBot
+Disallow: /
+
+User-agent: Screaming Frog SEO Spider
+Disallow: /
+
+User-agent: SiteCheckerBot
+Disallow: /
+
+User-agent: Deepcrawl
+Disallow: /
+
+# Bloquear ferramentas de arquivamento
+User-agent: archive.org_bot
+Disallow: /
+
+User-agent: WaybackArchiveBot
+Disallow: /
+
+# Bloquear bots de cópia de conteúdo
+User-agent: CopyRightCheck
+Disallow: /
+
+User-agent: Plukkie
+Disallow: /
+
+User-agent: WebCopier
+Disallow: /
+
+User-agent: HTTrack
+Disallow: /
+
+User-agent: WebStripper
+Disallow: /
+
+User-agent: WebSauger
+Disallow: /
+
+User-agent: Teleport
+Disallow: /
+
+User-agent: WebZIP
+Disallow: /
+
+User-agent: Offline Explorer
+Disallow: /
+
+User-agent: SiteSnagger
+Disallow: /
+
+User-agent: WebCopy
+Disallow: /
+
+User-agent: HTTrack Website Copier
+Disallow: /
+
+User-agent: Downloader
+Disallow: /
+
+User-agent: GetRight
+Disallow: /
+
+User-agent: GetWeb
+Disallow: /
+
+User-agent: Go!Zilla
+Disallow: /
+
+User-agent: Go-Ahead-Got-It
+Disallow: /
+
+User-agent: GrabNet
+Disallow: /
+
+User-agent: Teleport Pro
+Disallow: /
+
+User-agent: WebReaper
+Disallow: /
+
+User-agent: WebFetch
+Disallow: /
+
+User-agent: WebMirror
+Disallow: /
+
+User-agent: WebSauger
+Disallow: /
+
+User-agent: eCatch
+Disallow: /
+
+User-agent: WebSnake
+Disallow: /
+
+User-agent: WebAuto
+Disallow: /
+
+User-agent: WebBandit
+Disallow: /
+
+User-agent: WebCopier
+Disallow: /
+
+User-agent: WebFetch
+Disallow: /
+
+User-agent: WebGo IS
+Disallow: /
+
+User-agent: WebLeacher
+Disallow: /
+
+User-agent: WebReaper
+Disallow: /
+
+User-agent: WebSucker
+Disallow: /
+
+User-agent: WebWhacker
+Disallow: /
+
+User-agent: WebZIP
+Disallow: /
+
+User-agent: Widow
+Disallow: /
+
+User-agent: WWWOFFLE
+Disallow: /
+
+User-agent: Xaldon WebSpider
+Disallow: /
+
+User-agent: Zeus
+Disallow: /
+
+# Impedir arquivamento e cache
+User-agent: *
+Disallow: /archive/
+Disallow: /cache/
+Disallow: /tmp/
+Disallow: /temp/
+
+# Bloquear acesso a diretórios sensíveis
+Disallow: /api/
+Disallow: /_next/
+Disallow: /src/
+Disallow: /lib/
+Disallow: /components/
+Disallow: /hooks/
