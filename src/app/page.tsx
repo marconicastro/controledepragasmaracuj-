@@ -29,6 +29,10 @@ function App() {
   }, []);
 
   const scrollToCheckout = () => {
+    // Enviar evento de alta intenção antes de rolar
+    if (typeof window !== 'undefined' && window.sendTrackingEvent) {
+      window.sendTrackingEvent('high_quality_traffic');
+    }
     document.getElementById('checkout').scrollIntoView({ behavior: 'smooth' });
   };
 
@@ -74,12 +78,6 @@ function App() {
                 alt="E-book Sistema de Controle de Trips" 
                 className="mx-auto max-w-full h-auto rounded-lg shadow-lg"
                 style={{ maxWidth: '200px' }}
-                draggable="false"
-                onContextMenu={(e) => e.preventDefault()}
-                onDragStart={(e) => e.preventDefault()}
-                onCopy={(e) => e.preventDefault()}
-                onCut={(e) => e.preventDefault()}
-                onPaste={(e) => e.preventDefault()}
               />
             </div>
 
@@ -110,7 +108,13 @@ function App() {
 
             {/* CTA Principal Mega Otimizado - Responsivo */}
             <Button 
-              onClick={scrollToCheckout}
+              onClick={() => {
+                // Enviar evento de alta intenção
+                if (typeof window !== 'undefined' && window.sendTrackingEvent) {
+                  window.sendTrackingEvent('high_quality_traffic');
+                }
+                scrollToCheckout();
+              }}
               className="bg-orange-500 hover:bg-orange-600 text-white font-black py-4 sm:py-6 px-6 sm:px-12 rounded-full text-base sm:text-xl md:text-2xl mb-4 sm:mb-6 transform hover:scale-105 transition-all duration-200 shadow-2xl animate-bounce w-full sm:w-auto"
             >
               <Rocket className="w-4 h-4 sm:w-6 sm:h-6 mr-2 sm:mr-3" />
@@ -229,12 +233,6 @@ function App() {
                     alt="Travamento das ponteiras causado por trips" 
                     className="mt-2 sm:mt-3 mx-auto max-w-full h-auto rounded-lg shadow-md"
                     style={{ maxWidth: '200px' }}
-                    draggable="false"
-                    onContextMenu={(e) => e.preventDefault()}
-                    onDragStart={(e) => e.preventDefault()}
-                    onCopy={(e) => e.preventDefault()}
-                    onCut={(e) => e.preventDefault()}
-                    onPaste={(e) => e.preventDefault()}
                   />
                 </div>
                 <div>
@@ -244,12 +242,6 @@ function App() {
                     alt="Frutos deformados e manchados por trips" 
                     className="mt-2 sm:mt-3 mx-auto max-w-full h-auto rounded-lg shadow-md"
                     style={{ maxWidth: '200px' }}
-                    draggable="false"
-                    onContextMenu={(e) => e.preventDefault()}
-                    onDragStart={(e) => e.preventDefault()}
-                    onCopy={(e) => e.preventDefault()}
-                    onCut={(e) => e.preventDefault()}
-                    onPaste={(e) => e.preventDefault()}
                   />
                 </div>
                 <div>
@@ -259,12 +251,6 @@ function App() {
                     alt="Viroses que matam as plantas causadas por trips" 
                     className="mt-2 sm:mt-3 mx-auto max-w-full h-auto rounded-lg shadow-md"
                     style={{ maxWidth: '200px' }}
-                    draggable="false"
-                    onContextMenu={(e) => e.preventDefault()}
-                    onDragStart={(e) => e.preventDefault()}
-                    onCopy={(e) => e.preventDefault()}
-                    onCut={(e) => e.preventDefault()}
-                    onPaste={(e) => e.preventDefault()}
                   />
                 </div>
               </div>
@@ -342,7 +328,13 @@ function App() {
             </div>
 
             <Button 
-              onClick={scrollToCheckout}
+              onClick={() => {
+                // Enviar evento de alta intenção
+                if (typeof window !== 'undefined' && window.sendTrackingEvent) {
+                  window.sendTrackingEvent('high_quality_traffic');
+                }
+                scrollToCheckout();
+              }}
               className="bg-yellow-400 hover:bg-yellow-500 text-green-800 font-black py-4 sm:py-6 px-6 sm:px-12 rounded-full text-base sm:text-xl transform hover:scale-105 transition-all duration-200 shadow-2xl w-full sm:w-auto"
             >
               <Target className="w-4 h-4 sm:w-6 sm:h-6 mr-2 sm:mr-3" />
@@ -511,7 +503,13 @@ function App() {
             </div>
 
             <Button 
-              onClick={scrollToCheckout}
+              onClick={() => {
+                // Enviar evento de alta intenção
+                if (typeof window !== 'undefined' && window.sendTrackingEvent) {
+                  window.sendTrackingEvent('high_quality_traffic');
+                }
+                scrollToCheckout();
+              }}
               className="bg-yellow-400 hover:bg-yellow-500 text-red-600 font-black py-4 sm:py-6 px-6 sm:px-12 rounded-full text-base sm:text-xl transform hover:scale-105 transition-all duration-200 shadow-2xl animate-pulse w-full sm:w-auto"
             >
               <Zap className="w-4 h-4 sm:w-6 sm:h-6 mr-2 sm:mr-3" />
@@ -589,6 +587,22 @@ function App() {
                   href="https://pay.hotmart.com/I101398692S" 
                   target="_blank" 
                   rel="noopener noreferrer"
+                  onClick={() => {
+                    // Enviar evento de begin_checkout
+                    if (typeof window !== 'undefined' && window.sendTrackingEvent) {
+                      window.sendTrackingEvent('begin_checkout', {
+                        currency: 'BRL',
+                        value: 39.90,
+                        items: [{
+                          item_id: 'ebook-controle-trips',
+                          item_name: 'E-book Sistema de Controle de Trips',
+                          item_category: 'E-book',
+                          price: 39.90,
+                          quantity: 1
+                        }]
+                      });
+                    }
+                  }}
                   className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-4 sm:py-6 px-4 sm:px-6 rounded-lg text-base sm:text-xl transform hover:scale-105 transition-all duration-200 shadow-2xl inline-flex items-center justify-center gap-2 sm:gap-3"
                 >
                   <DollarSign className="w-4 h-4 sm:w-6 sm:h-6" />
@@ -627,7 +641,13 @@ function App() {
               </div>
               
               <Button 
-                onClick={scrollToCheckout}
+                onClick={() => {
+                  // Enviar evento de alta intenção
+                  if (typeof window !== 'undefined' && window.sendTrackingEvent) {
+                    window.sendTrackingEvent('high_quality_traffic');
+                  }
+                  scrollToCheckout();
+                }}
                 className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 sm:py-4 px-6 sm:px-8 rounded-full text-sm sm:text-lg w-full sm:w-auto"
               >
                 <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
