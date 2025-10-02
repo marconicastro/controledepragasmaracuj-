@@ -129,7 +129,7 @@ async function sendEventToFacebook(eventData: any, maxRetries: number = 3): Prom
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(eventData)
+        body: JSON.stringify(eventData.data)
       });
       
       if (!facebookResponse.ok) {
