@@ -4,7 +4,6 @@ import META_CONFIG, { formatUserDataForMeta, validateMetaConfig } from '@/lib/me
 import { getAllTrackingParams, initializeTracking, getHighQualityLocationData, getHighQualityPersonalData, validateDataQuality } from '@/lib/cookies';
 import { validateAndFixFacebookEvent, debugFacebookEvent } from '@/lib/facebookPixelValidation';
 import { eventManager } from '@/lib/eventManager';
-import EngagementTracker from './EngagementTracker';
 
 // --- FUNÇÕES SIMPLIFICADAS USANDO EVENT MANAGER ---
 
@@ -156,22 +155,6 @@ export default function AdvancedTracking() {
             eventManager.sendInitiateCheckout(testData);
             setTimeout(() => eventManager.sendInitiateCheckout(testData), 100);
             setTimeout(() => eventManager.sendInitiateCheckout(testData), 200);
-          },
-          // Funções avançadas de engajamento
-          forceHighEngagement: async () => {
-            console.log('🚀 Forçando evento de alto engajamento');
-            const result = await eventManager.sendHighEngagement({});
-            console.log('Resultado:', result);
-          },
-          sendScrollEvent: async (percentage: number) => {
-            console.log(`📊 Enviando evento de scroll ${percentage}%`);
-            const result = await eventManager.sendScrollDepth(percentage, {});
-            console.log('Resultado:', result);
-          },
-          sendTimeEvent: async (seconds: number) => {
-            console.log(`⏱️ Enviando evento de tempo ${seconds}s`);
-            const result = await eventManager.sendTimeOnPage(seconds, {});
-            console.log('Resultado:', result);
           }
         };
       }
@@ -181,12 +164,7 @@ export default function AdvancedTracking() {
     }
   }, []);
 
-  return (
-    <>
-      {/* Componente de rastreamento de engajamento avançado */}
-      <EngagementTracker />
-    </>
-  );
+  return null; // O componente não renderiza nada na tela.
 }
 
 // --- TIPAGEM GLOBAL ---
@@ -201,19 +179,9 @@ declare global {
       getEventManagerStats: () => any;
       clearEventManagerCache: () => void;
       testEventManagerDeduplication: () => void;
-      forceHighEngagement: () => Promise<void>;
-      sendScrollEvent: (percentage: number) => Promise<void>;
-      sendTimeEvent: (seconds: number) => Promise<void>;
     };
     markServerSideEventsSent?: () => void;
     _releaseBlockedEvents?: () => void;
     eventManager?: any;
-    engagementTracker?: {
-      getMetrics: () => any;
-      pause: () => void;
-      resume: () => void;
-      sendCustomEvent: (eventName: string, data: any) => Promise<any>;
-      forceHighEngagement: () => Promise<void>;
-    };
   }
 }
