@@ -18,7 +18,7 @@ export const META_CONFIG = {
   TRACKING: {
     // Habilitar/Desabilitar rastreamento específico
     enablePageView: false, // Gerenciado pelo GTM
-    enableViewContent: true,
+    enableViewContent: false, // Desabilitado para evitar duplicação
     enableInitiateCheckout: true,
     enablePurchase: true,
     enableLead: true,
@@ -99,7 +99,7 @@ export const META_CONFIG = {
 
 // Função para validar configuração
 export const validateMetaConfig = () => {
-  const errors = [];
+  const errors: string[] = [];
   
   if (META_CONFIG.PIXEL_ID === 'SEU_PIXEL_ID_AQUI') {
     errors.push('⚠️ PIXEL_ID não configurado. Substitua "SEU_PIXEL_ID_AQUI" pelo seu ID real do Facebook Pixel.');

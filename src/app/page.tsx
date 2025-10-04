@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, X, AlertTriangle, Clock, Shield, Star, Rocket, Phone, Mail, TrendingUp, Target, Zap, Award, Users, DollarSign, ArrowRight, PlayCircle, Download } from 'lucide-react';
 import PreCheckoutModal from '@/components/PreCheckoutModal';
-import { getFacebookCookies, getGoogleClientId, buildURLWithUTM, getStoredUTMParameters } from '@/lib/cookies';
+import { useTracking } from '@/hooks/use-tracking';
+import { buildURLWithUTM } from '@/lib/cookies';
 import META_CONFIG from '@/lib/metaConfig';
 
 export default function App() {
@@ -16,6 +17,9 @@ export default function App() {
 
   // Estado para controlar o modal de pré-checkout
   const [isPreCheckoutModalOpen, setIsPreCheckoutModalOpen] = useState(false);
+
+  // Hook de tracking
+  const tracking = useTracking();
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -44,49 +48,33 @@ export default function App() {
   const handlePreCheckoutSubmit = async (formData) => {
     console.log('🚀 Dados recebidos do formulário:', formData);
     
-    // Garantir que o nome completo esteja limpo e formatado corretamente
-    const cleanFullName = formData.fullName
-      .trim()
-      .replace(/\s+/g, ' ') // Remove espaços extras
-      .replace(/[^a-zA-ZÀ-ÿ\s'-]/g, '') // Remove caracteres inválidos
-      .replace(/^-+|-+$/g, '') // Remove hífens do início/fim
-      .replace(/^'+|'+$/g, ''); // Remove apóstrofos do início/fim
-    
-    console.log('Nome limpo:', cleanFullName);
-    console.log('Email:', formData.email);
-    console.log('Telefone:', formData.phone);
+    // Salvar dados do usuário usando nosso sistema de tracking
+    tracking.savePersonalData({
+      email: formData.email,
+      phone: formData.phone,
+      firstName: formData.fullName.split(' ')[0] || '',
+      lastName: formData.fullName.split(' ').slice(1).join(' ') || '',
+      city: formData.city,
+      state: formData.state,
+      zip: formData.cep,
+      country: 'BR'
+    });
 
-    // Capturar cookies necessários usando os utilitários
-    const { fbc, fbp } = getFacebookCookies();
-    const clientId = getGoogleClientId();
-    
-    // Capturar parâmetros UTM armazenados
-    const utmParams = getStoredUTMParameters();
-    console.log('📊 Parâmetros UTM capturados:', utmParams);
+    // Disparar evento de InitiateCheckout
+    tracking.trackInitiateCheckout({
+      fullName: formData.fullName,
+      email: formData.email,
+      phone: formData.phone,
+      city: formData.city,
+      state: formData.state,
+      zip: formData.cep
+    });
 
     // Construir parâmetros adicionais para o checkout
     const additionalParams: Record<string, string> = {};
     
-    // 1. Parâmetros de Rastreamento (Manter)
-    if (clientId) {
-      additionalParams['cid'] = clientId;
-    }
-
-    // Montar parâmetros de rastreamento da Meta (sck)
-    const sckParams = new URLSearchParams();
-    if (fbp) {
-      sckParams.set('_fbp', fbp);
-    }
-    if (fbc) {
-      sckParams.set('_fbc', fbc);
-    }
-    const sckValue = sckParams.toString();
-    if (sckValue) {
-      additionalParams['sck'] = sckValue;
-    }
-
-    // 2. Parâmetros de Pré-preenchimento
-    additionalParams['name'] = cleanFullName;
+    // 1. Parâmetros de Pré-preenchimento
+    additionalParams['name'] = formData.fullName;
     additionalParams['email'] = formData.email;
     
     // Para o Telefone: Formato esperado pela máscara "99 99999-9999"
@@ -125,7 +113,7 @@ export default function App() {
       }
     }
 
-    // 3. Parâmetros adicionais
+    // 2. Parâmetros adicionais
     if (formData.city && formData.city.trim() !== '') {
       additionalParams['city'] = formData.city.trim();
     }
@@ -153,95 +141,16 @@ export default function App() {
       console.log(`${key}:`, value);
     });
 
-    // Enriquecer dados do usuário para melhor rastreamento
-    const userData = {
-      email: formData.email,
-      phone: formData.phone.replace(/\D/g, ''),
-      firstName: formData.fullName.split(' ')[0] || '',
-      lastName: formData.fullName.split(' ').slice(1).join(' ') || '',
-      city: formData.city,
-      state: formData.state,
-      zip: formData.cep.replace(/\D/g, '')
-    };
-
-    // Obter dados de localização de alta qualidade para incluir no rastreamento
-    let locationData = {
-      city: formData.city,
-      state: formData.state,
-      zip: formData.cep.replace(/\D/g, ''),
-      country: 'BR'
-    };
-
-    const enrichedUserData = {
-      ...userData,
-      ...locationData, // Incluir dados geográficos!
-      fbc: fbc,
-      fbp: fbp,
-      ga_client_id: clientId,
-      external_id: formData.email ? formData.email.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() : undefined,
-      // Incluir UTM parameters para rastreamento
-      utm_source: utmParams.utm_source,
-      utm_medium: utmParams.utm_medium,
-      utm_campaign: utmParams.utm_campaign,
-      utm_content: utmParams.utm_content,
-      utm_term: utmParams.utm_term
-    };
-
-    console.log('📊 Dados do usuário enriquecidos para Meta:', enrichedUserData);
-    console.log('🌍 Dados geográficos incluídos:', {
-      city: enrichedUserData.city,
-      state: enrichedUserData.state,
-      zip: enrichedUserData.zip,
-      country: enrichedUserData.country
-    });
-    console.log('📧 Dados de contato:', {
-      email: enrichedUserData.email,
-      phone: enrichedUserData.phone,
-      firstName: enrichedUserData.firstName,
-      lastName: enrichedUserData.lastName
-    });
-    console.log('🔑 Dados de rastreamento:', {
-      fbc: enrichedUserData.fbc,
-      fbp: enrichedUserData.fbp,
-      ga_client_id: enrichedUserData.ga_client_id,
-      external_id: enrichedUserData.external_id
-    });
-    console.log('📊 Dados de UTM incluídos:', {
-      utm_source: enrichedUserData.utm_source,
-      utm_medium: enrichedUserData.utm_medium,
-      utm_campaign: enrichedUserData.utm_campaign,
-      utm_content: enrichedUserData.utm_content,
-      utm_term: enrichedUserData.utm_term
-    });
-
-    // Disparar evento de checkout com dados do usuário enriquecidos
-    if (typeof window !== 'undefined' && window.advancedTracking) {
-      await window.advancedTracking.trackCheckout(enrichedUserData);
-    }
-
-    // Salvar dados pessoais no localStorage para uso futuro em view_content e page_view
-    if (typeof window !== 'undefined') {
-      try {
-        const personalDataToSave = {
-          fn: enrichedUserData.firstName,
-          ln: enrichedUserData.lastName,
-          em: enrichedUserData.email,
-          ph: enrichedUserData.phone
-        };
-        localStorage.setItem('user_personal_data', JSON.stringify(personalDataToSave));
-        console.log('💾 Dados pessoais salvos para uso futuro em eventos:', personalDataToSave);
-      } catch (error) {
-        console.error('❌ Erro ao salvar dados pessoais no localStorage:', error);
-      }
-    }
-
     // Fechar modal e redirecionar
     setIsPreCheckoutModalOpen(false);
     window.location.href = finalUrlString;
   };
 
   const scrollToCheckout = () => {
-    document.getElementById('checkout').scrollIntoView({ behavior: 'smooth' });
+    const checkoutElement = document.getElementById('checkout');
+    if (checkoutElement) {
+      checkoutElement.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   // Função principal de checkout (LEGADO - mantida para compatibilidade)
