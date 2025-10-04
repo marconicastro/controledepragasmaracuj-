@@ -291,10 +291,7 @@ const GTM = {
   initializeGTM,
   pushToDataLayer,
   updateUserData,
-  trackEvent,
-  MetaEvents,
-  EngagementEvents,
-  TrackingUtils
+  trackEvent
 };
 
 export default GTM;
