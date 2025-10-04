@@ -3,14 +3,22 @@
 import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { getAllTrackingParams, initializeTracking } from '@/lib/cookies';
-import { eventManager } from '@/lib/eventManager';
 
 declare global {
   interface Window {
     dataLayer: any[];
     gtag: (...args: any[]) => void;
     fbq: (...args: any[]) => void;
-    eventManager?: any;
+    advancedTracking?: {
+      trackCheckout: (userData: any) => Promise<void>;
+      trackViewContentWithUserData: (userData: any) => Promise<void>;
+      testCheckout: () => void;
+      getTrackingStats: () => { dataLayerLength: number; gtmInitialized: boolean };
+      testDataLayerPush: () => void;
+    };
+    _stapeGtmLoaded?: boolean;
+    _originalGtag?: (...args: any[]) => void;
+    _pixelEventsBlocked?: boolean;
   }
 }
 
@@ -21,222 +29,222 @@ interface StapeCustomContainerProps {
 export default function StapeCustomContainer({ gtmId = 'GTM-567XZCDX' }: StapeCustomContainerProps) {
   const pathname = usePathname();
   const gtmInitialized = useRef(false);
+  const scriptLoaded = useRef(false);
 
   useEffect(() => {
-    if (typeof window === 'undefined' || gtmInitialized.current) return;
+    // Verificação global - se o pixel já foi carregado em qualquer lugar
+    if (typeof window !== 'undefined' && window._stapeGtmLoaded) {
+      console.log('🚫 GTM já carregado globalmente - evitando duplicação');
+      gtmInitialized.current = true;
+      return;
+    }
+    
+    if (typeof window === 'undefined' || gtmInitialized.current || scriptLoaded.current) return;
+    
+    // Marcar como carregado imediatamente para evitar race conditions
+    scriptLoaded.current = true;
     
     // Inicializar dataLayer se não existir
     window.dataLayer = window.dataLayer || [];
     
-    // Expor EventManager no window para depuração
-    window.eventManager = eventManager;
-    
-    // Função gtag simplificada
+    // Função gtag simplificada - permite configuração mas bloqueia eventos automáticos duplicados
     window.gtag = function gtag(...args: any[]) {
-      // Não enviar eventos de rastreamento automáticos - deixar para o EventManager
-      if (args[0] === 'event' && ['page_view', 'view_content', 'initiate_checkout'].includes(args[1])) {
-        console.log(`🚫 Evento ${args[1]} bloqueado no GTM - gerenciado pelo EventManager`);
+      // Permitir configurações básicas
+      if (args[0] === 'config' || args[0] === 'js' || args[0] === 'set') {
+        window.dataLayer.push(args);
         return;
       }
-      window.dataLayer.push(args);
+      
+      // Bloquear eventos automáticos duplicados, mas permitir eventos manuais
+      if (args[0] === 'event') {
+        const eventName = args[1];
+        
+        // Bloquear apenas eventos automáticos duplicados
+        if (eventName === 'page_view' && !window._pixelEventsBlocked) {
+          console.log('🚫 PageView automático bloqueado - GTM gerenciará');
+          window._pixelEventsBlocked = true; // Marcar que já bloqueamos
+          return;
+        }
+        
+        if (eventName === 'view_content' && !window._pixelEventsBlocked) {
+          console.log('🚫 ViewContent automático bloqueado - GTM gerenciará');
+          return;
+        }
+        
+        // Permitir eventos manuais (checkout, etc)
+        if (['initiate_checkout', 'purchase', 'lead'].includes(eventName)) {
+          window.dataLayer.push(args);
+          return;
+        }
+        
+        // Permitir outros eventos que não sejam duplicados
+        window.dataLayer.push(args);
+      }
     };
 
-    // Configuração inicial do GTM (sem eventos automáticos)
+    // Configuração inicial do GTM
     window.gtag('js', new Date());
-    window.gtag('config', gtmId, { 
-      send_page_view: false // Desativar envio automático de page_view
-    });
 
-    // Enviar PageView via EventManager (coordenado)
-    const sendPageView = async () => {
-      console.log('📍 Enviando PageView via EventManager...');
+    // Inicializar o GTM e configurar dados
+    const initializeGTM = async () => {
+      console.log('📍 Inicializando GTM com controle de eventos...');
       
       try {
-        // 1. Capturar FBC PRIMEIRO (crítico para qualidade)
+        // 1. Capturar parâmetros de rastreamento
         await initializeTracking();
-        
-        // 2. Pequeno delay para garantir processamento do cookie FBC
         await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // 3. Obter todos os parâmetros de rastreamento com FBC garantido
         const trackingParams = await getAllTrackingParams();
         
-        // 4. Garantir captura do FBC - TENTATIVA AGRESSIVA
-        let fbc = trackingParams.fbc;
-        
-        // Se não tiver FBC, tentar capturar da URL novamente
-        if (!fbc && typeof window !== 'undefined') {
-          const urlParams = new URLSearchParams(window.location.search);
-          const fbclid = urlParams.get('fbclid');
-          
-          if (fbclid) {
-            // Criar FBC no formato correto
-            const timestamp = Date.now();
-            fbc = `fb.1.${timestamp}.${fbclid}`;
-            
-            // Salvar no cookie para futuros eventos
-            const expirationDate = new Date();
-            expirationDate.setDate(expirationDate.getDate() + 90);
-            document.cookie = `_fbc=${fbc}; expires=${expirationDate.toUTCString()}; path=/; domain=${window.location.hostname}; SameSite=Lax`;
-            
-            console.log('🎯 FBC capturado e salvo no PageView:', fbc);
-            
-            // Atualizar trackingParams com o FBC capturado
-            trackingParams.fbc = fbc;
-          }
-        }
-        
-        // Se ainda não tiver FBC, tentar obter do cookie novamente
-        if (!fbc && typeof window !== 'undefined') {
-          const fbcCookie = document.cookie.match(new RegExp('(^| )_fbc=([^;]+)'));
-          if (fbcCookie) {
-            fbc = fbcCookie[2];
-            trackingParams.fbc = fbc;
-            console.log('🎯 FBC obtido do cookie no PageView:', fbc);
-          }
-        }
-        
-        // Log do status do FBC para depuração
-        console.log('📊 Status FBC no PageView:', fbc ? '✅ Presente' : '❌ Ausente');
-        if (fbc) {
-          console.log('🔑 FBC value:', fbc);
-        }
-        
-        // 5. Preparar dados do usuário para PageView
-        const pageViewUserData = {
-          ct: trackingParams.city,
-          st: trackingParams.state,
-          zp: trackingParams.zip,
-          country: trackingParams.country,
+        // 2. Preparar dados do usuário
+        const userData = {
+          user_data: {
+            em: trackingParams.email,
+            ph: trackingParams.phone,
+            fn: trackingParams.firstName,
+            ln: trackingParams.lastName,
+            ct: trackingParams.city,
+            st: trackingParams.state,
+            zp: trackingParams.zip,
+            country: trackingParams.country || 'BR'
+          },
           fbc: trackingParams.fbc,
           fbp: trackingParams.fbp,
-          ga_client_id: trackingParams.ga_client_id,
-          external_id: trackingParams.external_id
+          fbclid: trackingParams.fbclid,
+          external_id: trackingParams.external_id,
+          utm_source: trackingParams.utm_source,
+          utm_medium: trackingParams.utm_medium,
+          utm_campaign: trackingParams.utm_campaign,
+          utm_content: trackingParams.utm_content,
+          utm_term: trackingParams.utm_term
         };
         
-        // 6. Enviar PageView via EventManager (não envia via GTM para evitar duplicação)
-        console.log('📍 Enviando PageView com FBC garantido via EventManager');
+        // 3. Configurar dataLayer com dados do usuário (sem eventos automáticos)
+        window.dataLayer.push({
+          'user_data': userData.user_data,
+          'fbc': userData.fbc,
+          'fbp': userData.fbp,
+          'fbclid': userData.fbclid,
+          'x-stape-user-id': userData.external_id,
+          'utm_source': userData.utm_source,
+          'utm_medium': userData.utm_medium,
+          'utm_campaign': userData.utm_campaign,
+          'utm_content': userData.utm_content,
+          'utm_term': userData.utm_term
+        });
         
-        // Enviar apenas client-side para PageView (server-side não é necessário para page views)
-        const pageViewResult = await eventManager.sendEvent('page_view', {
-          user_data: pageViewUserData,
-          custom_data: {
-            page_title: document.title,
-            page_location: window.location.href,
-            page_path: pathname
-          }
-        }, { forceClient: true }); // Forçar apenas client-side para page_view
+        console.log('✅ Dados de rastreamento configurados no dataLayer');
         
-        console.log('✅ PageView enviado via EventManager:', pageViewResult);
-        
-        // 7. Enviar ViewContent após um pequeno delay (lógica do AdvancedTracking)
-        setTimeout(async () => {
-          console.log('🎯 Enviando ViewContent via EventManager (integrado do AdvancedTracking)...');
-          
-          // Obter dados de localização e pessoais de alta qualidade com múltiplas fontes
-          const { getHighQualityLocationData, getEnhancedPersonalData } = await import('@/lib/cookies');
-          const locationData = await getHighQualityLocationData();
-          const personalData = await getEnhancedPersonalData(); // Usar a nova função enhanced
-          
-          // Preparar dados do usuário formatados
-          const viewContentUserData = {
-            em: personalData.em,
-            ph: personalData.ph,
-            fn: personalData.fn,
-            ln: personalData.ln,
-            ct: locationData.city,
-            st: locationData.state,
-            zp: locationData.zip,
-            country: locationData.country,
-            fbc: trackingParams.fbc,
-            fbp: trackingParams.fbp,
-            ga_client_id: trackingParams.ga_client_id,
-            external_id: trackingParams.external_id
-          };
-          
-          console.log('📊 Dados pessoais para ViewContent:', {
-            em: personalData.em ? '✅ Presente' : '❌ Ausente',
-            ph: personalData.ph ? '✅ Presente' : '❌ Ausente',
-            fn: personalData.fn ? '✅ Presente' : '❌ Ausente',
-            ln: personalData.ln ? '✅ Presente' : '❌ Ausente'
-          });
-          
-          // Enviar ViewContent via EventManager
-          const viewContentResult = await eventManager.sendViewContent(viewContentUserData);
-          
-          if (viewContentResult.success) {
-            console.log('✅ ViewContent enviado com sucesso via EventManager (integrado):', viewContentResult);
-          } else {
-            console.error('❌ Falha ao enviar ViewContent via EventManager (integrado)');
-          }
-        }, 500);
-        
-        // 8. Expor funções globais para checkout (lógica do AdvancedTracking)
+        // 4. Expor funções globais para checkout
         if (typeof window !== 'undefined') {
-          // Importar a função trackCheckout do AdvancedTracking
-          const { trackCheckout } = await import('@/components/AdvancedTracking');
-          
           window.advancedTracking = {
-            trackCheckout,
-            trackViewContentWithUserData: async (userData: any) => {
-              console.log('🚀 Enviando ViewContent com dados do usuário via EventManager...');
-              const result = await eventManager.sendViewContent(userData);
-              if (result.success) {
-                console.log('✅ ViewContent com dados do usuário enviado com sucesso:', result);
-              } else {
-                console.error('❌ Falha ao enviar ViewContent com dados do usuário');
-              }
-            },
-            // Função de teste para o Pixel Helper
-            testCheckout: () => {
-              console.log('🧪 TESTANDO CHECKOUT NO PIXEL HELPER');
-              trackCheckout({
-                email: 'teste@email.com',
-                phone: '11999999999',
-                firstName: 'Teste',
-                lastName: 'Usuario',
-                city: 'São Paulo',
-                state: 'SP',
-                zip: '01310-100',
-                country: 'BR'
-              });
-            },
-            // Funções de depuração do EventManager
-            getEventManagerStats: () => {
-              return eventManager.getCacheStats();
-            },
-            clearEventManagerCache: () => {
-              eventManager.clearCache();
-            },
-            testEventManagerDeduplication: () => {
-              console.log('🧪 Testando deduplicação do EventManager...');
-              // Testar envio do mesmo evento múltiplas vezes
-              const testData = {
-                email: 'teste@deduplicacao.com',
-                phone: '11999999999',
-                firstName: 'Teste',
-                lastName: 'Deduplicação'
+            trackCheckout: async (userData: any) => {
+              console.log('🚀 Enviando InitiateCheckout via dataLayer...');
+              
+              const checkoutData = {
+                'event': 'initiate_checkout',
+                'user_data': {
+                  em: userData.email || userData.em,
+                  ph: userData.phone || userData.ph,
+                  fn: userData.firstName || userData.fn,
+                  ln: userData.lastName || userData.ln,
+                  ct: userData.city || userData.ct,
+                  st: userData.state || userData.st,
+                  zp: userData.zip || userData.zp,
+                  country: userData.country || 'BR'
+                },
+                'fbc': userData.fbc || trackingParams.fbc,
+                'fbp': userData.fbp || trackingParams.fbp,
+                'fbclid': userData.fbclid || trackingParams.fbclid,
+                'x-stape-user-id': userData.external_id || trackingParams.external_id,
+                'utm_source': userData.utm_source || trackingParams.utm_source,
+                'utm_medium': userData.utm_medium || trackingParams.utm_medium,
+                'utm_campaign': userData.utm_campaign || trackingParams.utm_campaign,
+                'utm_content': userData.utm_content || trackingParams.utm_content,
+                'utm_term': userData.utm_term || trackingParams.utm_term,
+                'value': '39.90',
+                'currency': 'BRL',
+                'content_name': 'E-book Sistema de Controle de Trips',
+                'content_category': 'E-book',
+                'content_ids': '["ebook-controle-trips"]',
+                'num_items': '1',
+                'items': '[{"id":"ebook-controle-trips","quantity":1,"item_price":39.90}]'
               };
               
-              // Enviar o mesmo evento 3 vezes - só o primeiro deve passar
-              eventManager.sendInitiateCheckout(testData);
-              setTimeout(() => eventManager.sendInitiateCheckout(testData), 100);
-              setTimeout(() => eventManager.sendInitiateCheckout(testData), 200);
+              window.dataLayer.push(checkoutData);
+              console.log('✅ InitiateCheckout enviado via dataLayer');
+            },
+            trackViewContentWithUserData: async (userData: any) => {
+              console.log('🚀 Enviando ViewContent com dados do usuário via dataLayer...');
+              
+              const viewContentUserData = {
+                'event': 'view_content',
+                'user_data': {
+                  em: userData.email || userData.em,
+                  ph: userData.phone || userData.ph,
+                  fn: userData.firstName || userData.fn,
+                  ln: userData.lastName || userData.ln,
+                  ct: userData.city || userData.ct,
+                  st: userData.state || userData.st,
+                  zp: userData.zip || userData.zp,
+                  country: userData.country || 'BR'
+                },
+                'fbc': userData.fbc || trackingParams.fbc,
+                'fbp': userData.fbp || trackingParams.fbp,
+                'fbclid': userData.fbclid || trackingParams.fbclid,
+                'x-stape-user-id': userData.external_id || trackingParams.external_id,
+                'utm_source': userData.utm_source || trackingParams.utm_source,
+                'utm_medium': userData.utm_medium || trackingParams.utm_medium,
+                'utm_campaign': userData.utm_campaign || trackingParams.utm_campaign,
+                'utm_content': userData.utm_content || trackingParams.utm_content,
+                'utm_term': userData.utm_term || trackingParams.utm_term
+              };
+              
+              window.dataLayer.push(viewContentUserData);
+              console.log('✅ ViewContent com dados do usuário enviado via dataLayer');
+            },
+            testCheckout: () => {
+              console.log('🧪 TESTANDO CHECKOUT');
+              if (window.advancedTracking) {
+                window.advancedTracking.trackCheckout({
+                  email: 'teste@email.com',
+                  phone: '11999999999',
+                  firstName: 'Teste',
+                  lastName: 'Usuario',
+                  city: 'São Paulo',
+                  state: 'SP',
+                  zip: '01310-100',
+                  country: 'BR'
+                });
+              }
+            },
+            getTrackingStats: () => {
+              return {
+                dataLayerLength: window.dataLayer ? window.dataLayer.length : 0,
+                gtmInitialized: gtmInitialized.current
+              };
+            },
+            testDataLayerPush: () => {
+              console.log('🧪 Testando push para dataLayer...');
+              window.dataLayer.push({
+                'event': 'test_event',
+                'test_data': 'test_value',
+                'timestamp': new Date().toISOString()
+              });
             }
           };
         }
         
-        // 9. Marcar GTM como inicializado
+        // 5. Marcar GTM como inicializado
         gtmInitialized.current = true;
         
       } catch (error) {
-        console.error('❌ Erro ao enviar eventos via EventManager:', error);
-        gtmInitialized.current = true; // Marcar como inicializado mesmo com erro
+        console.error('❌ Erro ao inicializar GTM:', error);
+        gtmInitialized.current = true;
       }
     };
 
-    // Enviar PageView de forma assíncrona
-    sendPageView();
+    // Inicializar GTM de forma assíncrona
+    initializeGTM();
     
   }, [pathname, gtmId]);
 
@@ -246,7 +254,89 @@ export default function StapeCustomContainer({ gtmId = 'GTM-567XZCDX' }: StapeCu
       <script
         dangerouslySetInnerHTML={{
           __html: `
-            (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s);j.async=true;j.src="https://data.maracujazeropragas.com/24rckptuywp.js?"+i;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','4n13l=GRNEMiA9RlZGQCEvNzQzRQZKS1tFVg8NTRoYBxUTHgkRDRwHGwAZAhcWClsXHwY%3D');
+            // Verificação global para evitar duplicação
+            if (typeof window !== 'undefined') {
+              if (window._stapeGtmLoaded) {
+                console.log('🚫 GTM já carregado - evitando duplicação');
+                return;
+              }
+              
+              // Marcar como carregado globalmente
+              window._stapeGtmLoaded = true;
+              
+              // Inicializar dataLayer se não existir
+              window.dataLayer = window.dataLayer || [];
+              
+              // Proteger gtag original se existir
+              if (typeof window.gtag === 'function') {
+                window._originalGtag = window.gtag;
+              }
+              
+              // Sobrescrever gtag para controle fino de eventos
+              window.gtag = function() {
+                // Permitir configurações
+                if (arguments[0] === 'config' || arguments[0] === 'js' || arguments[0] === 'set') {
+                  if (window.dataLayer) {
+                    window.dataLayer.push(arguments);
+                  }
+                  return;
+                }
+                
+                // Controle de eventos
+                if (arguments[0] === 'event') {
+                  const eventName = arguments[1];
+                  
+                  // Permitir PageView apenas uma vez (do GTM, não do React)
+                  if (eventName === 'page_view') {
+                    if (!window._pageViewSent) {
+                      window._pageViewSent = true;
+                      if (window.dataLayer) {
+                        window.dataLayer.push(arguments);
+                      }
+                      console.log('✅ PageView enviado (única vez)');
+                    } else {
+                      console.log('🚫 PageView duplicado bloqueado');
+                    }
+                    return;
+                  }
+                  
+                  // Bloquear ViewContent automático
+                  if (eventName === 'view_content') {
+                    console.log('🚫 ViewContent automático bloqueado');
+                    return;
+                  }
+                  
+                  // Permitir eventos manuais
+                  if (['initiate_checkout', 'purchase', 'lead'].includes(eventName)) {
+                    if (window.dataLayer) {
+                      window.dataLayer.push(arguments);
+                    }
+                    console.log('✅ Evento manual permitido:', eventName);
+                    return;
+                  }
+                  
+                  // Permitir outros eventos
+                  if (window.dataLayer) {
+                    window.dataLayer.push(arguments);
+                  }
+                }
+              };
+              
+              // Configurar GTM
+              window.dataLayer.push({
+                'gtm.start': new Date().getTime(),
+                'event': 'gtm.js'
+              });
+              
+              // Carregar GTM
+              (function(w,d,s,l,i){
+                w[l]=w[l]||[];
+                var f=d.getElementsByTagName(s)[0],j=d.createElement(s);
+                j.async=true;
+                j.src="https://data.maracujazeropragas.com/24rckptuywp.js?"+i;
+                f.parentNode.insertBefore(j,f);
+              })(window,document,'script','dataLayer','4n13l=GRNEMiA9RlZGQCEvNzQzRQZKS1tFVg8NTRoYBxUTHgkRDRwHGwAZAhcWClsXHwY%3D');
+            }
           `,
         }}
       />

@@ -215,8 +215,41 @@ export default function App() {
     });
 
     // Disparar evento de checkout com dados do usuário enriquecidos
-    if (typeof window !== 'undefined' && window.advancedTracking) {
-      await window.advancedTracking.trackCheckout(enrichedUserData);
+    // O evento é enviado diretamente via dataLayer pelo StapeCustomContainer
+    if (typeof window !== 'undefined' && window.dataLayer) {
+      console.log('🚀 Enviando InitiateCheckout via dataLayer...');
+      
+      const checkoutData = {
+        'event': 'initiate_checkout',
+        'user_data': {
+          em: enrichedUserData.email,
+          ph: enrichedUserData.phone,
+          fn: enrichedUserData.firstName,
+          ln: enrichedUserData.lastName,
+          ct: enrichedUserData.city,
+          st: enrichedUserData.state,
+          zp: enrichedUserData.zip,
+          country: enrichedUserData.country
+        },
+        'fbc': enrichedUserData.fbc,
+        'fbp': enrichedUserData.fbp,
+        'x-stape-user-id': enrichedUserData.external_id,
+        'utm_source': enrichedUserData.utm_source,
+        'utm_medium': enrichedUserData.utm_medium,
+        'utm_campaign': enrichedUserData.utm_campaign,
+        'utm_content': enrichedUserData.utm_content,
+        'utm_term': enrichedUserData.utm_term,
+        // Dados do produto
+        'value': '39.90',
+        'currency': 'BRL',
+        'content_name': 'E-book Sistema de Controle de Trips',
+        'content_category': 'E-book',
+        'content_ids': '["ebook-controle-trips"]',
+        'num_items': '1'
+      };
+      
+      window.dataLayer.push(checkoutData);
+      console.log('✅ InitiateCheckout enviado via dataLayer');
     }
 
     // Salvar dados pessoais no localStorage para uso futuro em view_content e page_view
@@ -241,7 +274,10 @@ export default function App() {
   };
 
   const scrollToCheckout = () => {
-    document.getElementById('checkout').scrollIntoView({ behavior: 'smooth' });
+    const checkoutElement = document.getElementById('checkout');
+    if (checkoutElement) {
+      checkoutElement.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   // Função principal de checkout (LEGADO - mantida para compatibilidade)
