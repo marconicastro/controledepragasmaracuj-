@@ -1,6 +1,6 @@
 /**
- * Utilitários simplificados para manipulação de cookies e rastreamento
- * Compatível com GTM e META CAPI Gateway STAPE
+ * Utilitários para manipulação de cookies e geolocalização
+ * Essencial para capturar fbc, fbp e dados de localização para rastreamento
  */
 
 /**
@@ -26,23 +26,6 @@ export function getFacebookCookies(): {
     fbc: getCookie('_fbc'),
     fbp: getCookie('_fbp')
   };
-}
-
-/**
- * Obtém o Google Analytics Client ID
- * @returns GA Client ID ou null se não existir
- */
-export function getGoogleClientId(): string | null {
-  const gaCookie = getCookie('_ga');
-  if (!gaCookie) return null;
-  
-  // Formato do cookie _ga: GA1.2.123456789.1234567890
-  const parts = gaCookie.split('.');
-  if (parts.length >= 4) {
-    return parts.slice(2).join('.');
-  }
-  
-  return null;
 }
 
 /**
@@ -83,7 +66,52 @@ export function captureFbclid(): void {
 }
 
 /**
- * Obtém parâmetros UTM armazenados no localStorage
+ * Captura parâmetros UTM da URL e os armazena em localStorage e cookies
+ * Esta função deve ser chamada no carregamento da página
+ */
+export function captureUTMParameters(): void {
+  if (typeof window === 'undefined') return;
+  
+  console.log('🚀 Capturando parâmetros UTM...');
+  
+  // Capturar parâmetros UTM da URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const utmParams = {
+    utm_source: urlParams.get('utm_source'),
+    utm_medium: urlParams.get('utm_medium'),
+    utm_campaign: urlParams.get('utm_campaign'),
+    utm_content: urlParams.get('utm_content'),
+    utm_term: urlParams.get('utm_term')
+  };
+  
+  // Armazenar no localStorage (duração mais longa)
+  Object.entries(utmParams).forEach(([key, value]) => {
+    if (value) {
+      localStorage.setItem(key, value);
+      console.log(`✅ UTM ${key} armazenado no localStorage:`, value);
+    }
+  });
+  
+  // Armazenar em cookies como backup (30 dias)
+  Object.entries(utmParams).forEach(([key, value]) => {
+    if (value) {
+      const expirationDate = new Date();
+      expirationDate.setDate(expirationDate.getDate() + 30);
+      document.cookie = `${key}=${value}; expires=${expirationDate.toUTCString()}; path=/; domain=${window.location.hostname}; SameSite=Lax`;
+      console.log(`✅ UTM ${key} armazenado em cookie:`, value);
+    }
+  });
+  
+  // Log de status dos UTMs
+  console.log('📊 Status dos parâmetros UTM:');
+  Object.keys(utmParams).forEach(key => {
+    const value = utmParams[key as keyof typeof utmParams];
+    console.log(`   - ${key}:`, value || 'Não encontrado');
+  });
+}
+
+/**
+ * Obtém parâmetros UTM armazenados (localStorage优先, cookie fallback)
  * @returns Objeto com os parâmetros UTM
  */
 export function getStoredUTMParameters(): {
@@ -103,156 +131,51 @@ export function getStoredUTMParameters(): {
   
   if (typeof window === 'undefined') return utmParams;
   
-  // Tentar obter do localStorage
-  try {
-    const savedUtmParams = localStorage.getItem('utm_parameters');
-    if (savedUtmParams) {
-      const parsed = JSON.parse(savedUtmParams);
-      Object.assign(utmParams, parsed);
+  // Tentar obter do localStorage primeiro
+  Object.keys(utmParams).forEach(key => {
+    const value = localStorage.getItem(key);
+    if (value) {
+      utmParams[key as keyof typeof utmParams] = value;
     }
-  } catch (error) {
-    console.error('❌ Erro ao recuperar UTM parameters do localStorage:', error);
-  }
+  });
+  
+  // Fallback para cookies
+  Object.keys(utmParams).forEach(key => {
+    if (!utmParams[key as keyof typeof utmParams]) {
+      const value = getCookie(key);
+      if (value) {
+        utmParams[key as keyof typeof utmParams] = value;
+      }
+    }
+  });
   
   return utmParams;
 }
 
 /**
- * Obtém o fbclid armazenado no localStorage
- * @returns fbclid ou null se não existir
+ * Adiciona campos ocultos de UTM a um formulário
+ * @param form Elemento do formulário onde adicionar os campos
  */
-export function getStoredFBCLID(): string | null {
-  if (typeof window === 'undefined') return null;
-  
-  try {
-    return localStorage.getItem('fbclid');
-  } catch (error) {
-    console.error('❌ Erro ao recuperar fbclid do localStorage:', error);
-    return null;
-  }
-}
-
-/**
- * Função para inicializar a captura de parâmetros de rastreamento
- * Deve ser chamada no carregamento da página
- */
-export async function initializeTracking(): Promise<void> {
+export function addUTMHiddenFields(form: HTMLFormElement): void {
   if (typeof window === 'undefined') return;
   
-  console.log('🚀 Inicializando captura de parâmetros de rastreamento...');
-  
-  // Capturar fbclid e criar cookie _fbc
-  captureFbclid();
-  
-  // Log de status dos cookies
-  const { fbc, fbp } = getFacebookCookies();
   const utmParams = getStoredUTMParameters();
-  const fbclid = getStoredFBCLID();
   
-  console.log('📊 Status dos cookies de rastreamento:');
-  console.log('   - _fbc:', fbc || 'Não encontrado');
-  console.log('   - _fbp:', fbp || 'Não encontrado');
-  console.log('   - fbclid:', fbclid || 'Não encontrado');
-  console.log('📊 Status dos parâmetros UTM:');
-  Object.keys(utmParams).forEach(key => {
-    const value = utmParams[key as keyof typeof utmParams];
-    console.log(`   - ${key}:`, value || 'Não encontrado');
+  Object.entries(utmParams).forEach(([key, value]) => {
+    if (value) {
+      // Verificar se campo já existe
+      let input = form.querySelector(`input[name="${key}"]`) as HTMLInputElement;
+      if (!input) {
+        input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.id = key;
+        form.appendChild(input);
+      }
+      input.value = value;
+      console.log(`📝 Campo UTM ${key} adicionado ao formulário:`, value);
+    }
   });
-}
-
-/**
- * Obtém todos os parâmetros de rastreamento necessários
- * @returns Promise com todos os parâmetros de rastreamento
- */
-export async function getAllTrackingParams(): Promise<{
-  email: string | null;
-  phone: string | null;
-  firstName: string | null;
-  lastName: string | null;
-  city: string | null;
-  state: string | null;
-  zip: string | null;
-  country: string | null;
-  fbc: string | null;
-  fbp: string | null;
-  fbclid: string | null;
-  ga_client_id: string | null;
-  external_id: string | null;
-  utm_source: string | null;
-  utm_medium: string | null;
-  utm_campaign: string | null;
-  utm_content: string | null;
-  utm_term: string | null;
-}> {
-  // Garantir que o rastreamento está inicializado
-  await initializeTracking();
-  
-  // Obter cookies do Facebook
-  const { fbc, fbp } = getFacebookCookies();
-  
-  // Obter GA Client ID
-  const ga_client_id = getGoogleClientId();
-  
-  // Obter UTM parameters
-  const utmParams = getStoredUTMParameters();
-  
-  // Obter fbclid
-  const fbclid = getStoredFBCLID();
-  
-  // Gerar external_id baseado em email se disponível
-  let external_id: string | null = null;
-  try {
-    const savedEmail = localStorage.getItem('user_email');
-    if (savedEmail) {
-      external_id = savedEmail.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-    }
-  } catch (error) {
-    console.error('❌ Erro ao gerar external_id:', error);
-  }
-  
-  return {
-    email: null, // Será preenchido pelo formulário
-    phone: null, // Será preenchido pelo formulário
-    firstName: null, // Será preenchido pelo formulário
-    lastName: null, // Será preenchido pelo formulário
-    city: null, // Será preenchido pelo formulário
-    state: null, // Será preenchido pelo formulário
-    zip: null, // Será preenchido pelo formulário
-    country: 'BR', // Padrão Brasil
-    fbc,
-    fbp,
-    fbclid,
-    ga_client_id,
-    external_id,
-    utm_source: utmParams.utm_source,
-    utm_medium: utmParams.utm_medium,
-    utm_campaign: utmParams.utm_campaign,
-    utm_content: utmParams.utm_content,
-    utm_term: utmParams.utm_term
-  };
-}
-
-/**
- * Salva dados pessoais no localStorage para uso futuro
- * @param personalData Dados pessoais para salvar
- */
-export function savePersonalDataToLocalStorage(personalData: {
-  fn: string;
-  ln: string;
-  em: string;
-  ph: string;
-}): void {
-  if (typeof window === 'undefined') return;
-  
-  try {
-    localStorage.setItem('user_personal_data', JSON.stringify(personalData));
-    if (personalData.em) {
-      localStorage.setItem('user_email', personalData.em);
-    }
-    console.log('💾 Dados pessoais salvos no localStorage:', personalData);
-  } catch (error) {
-    console.error('❌ Erro ao salvar dados pessoais no localStorage:', error);
-  }
 }
 
 /**
@@ -286,34 +209,671 @@ export function buildURLWithUTM(baseUrl: string, additionalParams: Record<string
 }
 
 /**
- * Adiciona campos ocultos de UTM a um formulário
- * @param form Elemento do formulário
+ * Função para inicializar a captura de parâmetros de rastreamento
+ * Deve ser chamada no carregamento da página
  */
-export function addUTMHiddenFields(form: HTMLFormElement): void {
+export function initializeTracking(): void {
   if (typeof window === 'undefined') return;
   
+  console.log('🚀 Inicializando captura de parâmetros de rastreamento...');
+  
+  // Capturar fbclid e criar cookie _fbc
+  captureFbclid();
+  
+  // Capturar parâmetros UTM
+  captureUTMParameters();
+  
+  // Log de status dos cookies
+  const { fbc, fbp } = getFacebookCookies();
   const utmParams = getStoredUTMParameters();
-  
-  // Adicionar campos UTM ocultos ao formulário
-  Object.entries(utmParams).forEach(([key, value]) => {
-    if (value) {
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = key;
-      input.value = value;
-      form.appendChild(input);
-    }
+  console.log('📊 Status dos cookies de rastreamento:');
+  console.log('   - _fbc:', fbc || 'Não encontrado');
+  console.log('   - _fbp:', fbp || 'Não encontrado');
+  console.log('📊 Status dos parâmetros UTM:');
+  Object.keys(utmParams).forEach(key => {
+    const value = utmParams[key as keyof typeof utmParams];
+    console.log(`   - ${key}:`, value || 'Não encontrado');
   });
+}
+
+/**
+ * Obtém o Google Analytics Client ID
+ * @returns GA Client ID ou null se não existir
+ */
+export function getGoogleClientId(): string | null {
+  const gaCookie = getCookie('_ga');
+  if (!gaCookie) return null;
   
-  // Adicionar fbclid se existir
-  const fbclid = getStoredFBCLID();
-  if (fbclid) {
-    const fbclidInput = document.createElement('input');
-    fbclidInput.type = 'hidden';
-    fbclidInput.name = 'fbclid';
-    fbclidInput.value = fbclid;
-    form.appendChild(fbclidInput);
+  // Formato do cookie _ga: GA1.2.123456789.1234567890
+  const parts = gaCookie.split('.');
+  if (parts.length >= 4) {
+    return parts.slice(2).join('.');
   }
   
-  console.log('📝 Campos UTM adicionados ao formulário:', utmParams);
+  return null;
 }
+
+/**
+ * Obtém dados pessoais do formulário automaticamente
+ * Captura nome, sobrenome, email e telefone dos campos do formulário sem precisar de campos adicionais
+ * @returns Objeto com dados pessoais ou null se não encontrar
+ */
+export function getFormPersonalData(): {
+  fn: string;
+  ln: string;
+  em: string;
+  ph: string;
+} | null {
+  if (typeof document === 'undefined') return null;
+  
+  console.log('🔍 Procurando dados pessoais no formulário...');
+  
+  // Mapeamento de possíveis nomes de campos para nome
+  const nameFields = ['name', 'nome', 'firstname', 'first_name', 'fn'];
+  // Mapeamento de possíveis nomes de campos para sobrenome
+  const lastNameFields = ['lastname', 'last_name', 'sobrenome', 'ln'];
+  // Mapeamento de possíveis nomes de campos para email
+  const emailFields = ['email', 'e-mail', 'mail', 'em'];
+  // Mapeamento de possíveis nomes de campos para telefone
+  const phoneFields = ['phone', 'telefone', 'celular', 'mobile', 'ph', 'whatsapp'];
+  
+  let fn = '';
+  let ln = '';
+  let em = '';
+  let ph = '';
+  
+  // Procurar campos de nome
+  for (const fieldName of nameFields) {
+    const input = document.querySelector(`input[name*="${fieldName}"], input[id*="${fieldName}"]`) as HTMLInputElement;
+    if (input && input.value.trim()) {
+      fn = input.value.trim();
+      console.log(`✅ Nome encontrado no campo "${fieldName}":`, fn);
+      break;
+    }
+  }
+  
+  // Procurar campos de sobrenome
+  for (const fieldName of lastNameFields) {
+    const input = document.querySelector(`input[name*="${fieldName}"], input[id*="${fieldName}"]`) as HTMLInputElement;
+    if (input && input.value.trim()) {
+      ln = input.value.trim();
+      console.log(`✅ Sobrenome encontrado no campo "${fieldName}":`, ln);
+      break;
+    }
+  }
+  
+  // Procurar campos de email
+  for (const fieldName of emailFields) {
+    const input = document.querySelector(`input[name*="${fieldName}"], input[id*="${fieldName}"]`) as HTMLInputElement;
+    if (input && input.value.trim()) {
+      em = input.value.trim();
+      console.log(`✅ Email encontrado no campo "${fieldName}":`, em);
+      break;
+    }
+  }
+  
+  // Procurar campos de telefone
+  for (const fieldName of phoneFields) {
+    const input = document.querySelector(`input[name*="${fieldName}"], input[id*="${fieldName}"]`) as HTMLInputElement;
+    if (input && input.value.trim()) {
+      ph = input.value.trim();
+      console.log(`✅ Telefone encontrado no campo "${fieldName}":`, ph);
+      break;
+    }
+  }
+  
+  // Se encontrou pelo menos um dado pessoal, retornar o objeto
+  if (fn || ln || em || ph) {
+    console.log('🎯 Dados pessoais capturados do formulário:', { fn, ln, em, ph });
+    return {
+      fn: fn || '',
+      ln: ln || '',
+      em: em || '',
+      ph: ph || ''
+    };
+  }
+  
+  console.log('ℹ️ Nenhum dado pessoal encontrado no formulário');
+  return null;
+}
+
+/**
+ * Obtém dados pessoais de ALTA QUALIDADE incluindo captura de dados do formulário
+ * @returns Promise com dados pessoais da melhor fonte disponível
+ */
+export async function getHighQualityPersonalData(): Promise<{
+  fn: string;
+  ln: string;
+  em: string;
+  ph: string;
+}> {
+  // 1. Tentar obter dados do formulário (mais precisos se disponíveis)
+  const formData = getFormPersonalData();
+  if (formData) {
+    console.log('🌍 Usando dados pessoais do formulário:', formData);
+    return formData;
+  }
+  
+  // 2. Retornar objeto vazio se não encontrar dados do formulário
+  console.log('ℹ️ Nenhum dado pessoal encontrado, retornando valores vazios');
+  return {
+    fn: '',
+    ln: '',
+    em: '',
+    ph: ''
+  };
+}
+
+/**
+ * Obtém dados de localização do formulário automaticamente
+ * Captura cidade, estado e CEP dos campos do formulário sem precisar de campos adicionais
+ * @returns Objeto com dados de localização ou null se não encontrar
+ */
+export function getFormLocationData(): {
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+} | null {
+  if (typeof document === 'undefined') return null;
+  
+  console.log('🔍 Procurando dados de localização no formulário...');
+  
+  // Mapeamento de possíveis nomes de campos para cidade
+  const cityFields = ['city', 'cidade', 'localidade', 'location', 'municipio'];
+  // Mapeamento de possíveis nomes de campos para estado
+  const stateFields = ['state', 'estado', 'uf', 'province', 'provincia'];
+  // Mapeamento de possíveis nomes de campos para CEP
+  const zipFields = ['zip', 'cep', 'postalcode', 'codigo_postal'];
+  
+  let city = '';
+  let state = '';
+  let zip = '';
+  
+  // Procurar campos de cidade
+  for (const fieldName of cityFields) {
+    const input = document.querySelector(`input[name*="${fieldName}"], input[id*="${fieldName}"]`) as HTMLInputElement;
+    if (input && input.value.trim()) {
+      city = input.value.trim();
+      console.log(`✅ Cidade encontrada no campo "${fieldName}":`, city);
+      break;
+    }
+  }
+  
+  // Procurar campos de estado
+  for (const fieldName of stateFields) {
+    const input = document.querySelector(`input[name*="${fieldName}"], input[id*="${fieldName}"], select[name*="${fieldName}"], select[id*="${fieldName}"]`) as HTMLInputElement | HTMLSelectElement;
+    if (input && input.value.trim()) {
+      state = input.value.trim();
+      console.log(`✅ Estado encontrado no campo "${fieldName}":`, state);
+      break;
+    }
+  }
+  
+  // Procurar campos de CEP
+  for (const fieldName of zipFields) {
+    const input = document.querySelector(`input[name*="${fieldName}"], input[id*="${fieldName}"]`) as HTMLInputElement;
+    if (input && input.value.trim()) {
+      zip = input.value.trim();
+      console.log(`✅ CEP encontrado no campo "${fieldName}":`, zip);
+      break;
+    }
+  }
+  
+  // Se encontrou pelo menos um dado de localização, retornar o objeto
+  if (city || state || zip) {
+    console.log('🎯 Dados de localização capturados do formulário:', { city, state, zip });
+    return {
+      city: city || '',
+      state: state || '',
+      zip: zip || '',
+      country: 'BR' // Padrão Brasil
+    };
+  }
+  
+  console.log('ℹ️ Nenhum dado de localização encontrado no formulário');
+  return null;
+}
+
+/**
+ * Obtém dados de localização de ALTA QUALIDADE incluindo captura de dados do formulário
+ * @returns Promise com dados de localização da melhor fonte disponível
+ */
+export async function getHighQualityLocationData(): Promise<{
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+}> {
+  // 1. Tentar obter dados do formulário (mais preciso se disponível)
+  const formData = getFormLocationData();
+  if (formData) {
+    console.log('🌍 Usando dados do formulário:', formData);
+    return formData;
+  }
+  
+  // 2. Tentar obter dados em cache (rápido e confiável)
+  const cachedGeoData = getCachedGeographicData();
+  if (cachedGeoData) {
+    console.log('🌍 Usando dados geográficos em cache:', cachedGeoData);
+    return {
+      city: cachedGeoData.city,
+      state: cachedGeoData.state,
+      zip: cachedGeoData.zip,
+      country: cachedGeoData.country
+    };
+  }
+  
+  // 3. Fallback para API externa
+  console.log('🌍 Buscando dados de localização via API externa...');
+  return await getLocationData();
+}
+
+/**
+ * Cache para dados geográficos para evitar múltiplas chamadas de API
+ */
+let geographicCache: {
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+  timestamp: number;
+} | null = null;
+
+/**
+ * Obtém dados de localização usando cache ou múltiplas APIs com fallback
+ * @returns Promise com dados de localização
+ */
+export async function getLocationData(): Promise<{
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+}> {
+  // Verificar se temos dados em cache (válidos por 30 minutos)
+  if (geographicCache && (Date.now() - geographicCache.timestamp) < 30 * 60 * 1000) {
+    console.log('✅ Usando dados geográficos em cache:', geographicCache);
+    return {
+      city: geographicCache.city,
+      state: geographicCache.state,
+      zip: geographicCache.zip,
+      country: geographicCache.country
+    };
+  }
+
+  console.log('🌍 Buscando novos dados geográficos...');
+  
+  // Tentar múltiplas APIs em sequência
+  const apis = [
+    // API 1: ipapi.co (mais precisa)
+    async () => {
+      try {
+        const response = await fetch('https://ipapi.co/json/', {
+          method: 'GET',
+          mode: 'cors',
+          cache: 'no-cache',
+          timeout: 5000
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          return {
+            city: data.city || '',
+            state: data.region_code || '',
+            zip: data.postal || '',
+            country: data.country || 'BR'
+          };
+        }
+      } catch (error) {
+        console.warn('⚠️ Falha na API ipapi.co:', error);
+      }
+      return null;
+    },
+    
+    // API 2: ip-api.com (fallback)
+    async () => {
+      try {
+        const response = await fetch('http://ip-api.com/json/', {
+          method: 'GET',
+          mode: 'cors',
+          cache: 'no-cache',
+          timeout: 5000
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          return {
+            city: data.city || '',
+            state: data.region || '',
+            zip: data.zip || '',
+            country: data.countryCode || 'BR'
+          };
+        }
+      } catch (error) {
+        console.warn('⚠️ Falha na API ip-api.com:', error);
+      }
+      return null;
+    },
+    
+    // API 3: geoip-js (fallback client-side)
+    async () => {
+      try {
+        // Tentar usar a geolocalização do navegador
+        if (typeof navigator !== 'undefined' && navigator.geolocation) {
+          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              timeout: 5000,
+              enableHighAccuracy: false
+            });
+          });
+          
+          // Reverse geocoding básico (aproximado)
+          const { latitude, longitude } = position.coords;
+          
+          // Para o Brasil, podemos fazer algumas suposições baseadas nas coordenadas
+          if (latitude > -34 && latitude < 5 && longitude > -74 && longitude < -34) {
+            return {
+              city: 'Desconhecida',
+              state: 'BR',
+              zip: '00000000',
+              country: 'BR'
+            };
+          }
+        }
+      } catch (error) {
+        console.warn('⚠️ Falha na geolocalização do navegador:', error);
+      }
+      return null;
+    }
+  ];
+
+  // Tentar cada API em sequência
+  for (const api of apis) {
+    const result = await api();
+    if (result && (result.city || result.state || result.zip)) {
+      console.log('✅ Dados de localização obtidos com sucesso:', result);
+      
+      // Armazenar em cache
+      geographicCache = {
+        city: result.city,
+        state: result.state,
+        zip: result.zip,
+        country: result.country,
+        timestamp: Date.now()
+      };
+      
+      return result;
+    }
+  }
+
+  // Fallback final com dados padrão do Brasil
+  console.warn('⚠️ Usando fallback de localização padrão (Brasil)');
+  const fallbackData = {
+    city: 'São Paulo',      // Cidade mais populosa como fallback
+    state: 'SP',            // Estado mais populoso como fallback
+    zip: '01310-100',       // CEP central de São Paulo
+    country: 'BR'           // Garantir Brasil
+  };
+  
+  // Armazenar fallback em cache também
+  geographicCache = {
+    city: fallbackData.city,
+    state: fallbackData.state,
+    zip: fallbackData.zip,
+    country: fallbackData.country,
+    timestamp: Date.now()
+  };
+  
+  return fallbackData;
+}
+
+/**
+ * Obtém dados geográficos em cache (para uso imediato)
+ */
+export function getCachedGeographicData(): {
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+} | null {
+  if (geographicCache && (Date.now() - geographicCache.timestamp) < 30 * 60 * 1000) {
+    return {
+      city: geographicCache.city,
+      state: geographicCache.state,
+      zip: geographicCache.zip,
+      country: geographicCache.country
+    };
+  }
+  return null;
+}
+
+/**
+ * Função para validar qualidade dos dados com feedback detalhado
+ * @param data Dados a serem validados
+ * @returns Objeto com score, problemas e recomendações
+ */
+export function validateDataQuality(data: any): {
+  score: number;
+  issues: string[];
+  recommendations: string[];
+  isValid: boolean;
+} {
+  const issues: string[] = [];
+  const recommendations: string[] = [];
+  let score = 0;
+  
+  // Validar FBC (mais importante - 30 pontos)
+  if (!data.fbc) {
+    issues.push('FBC não encontrado');
+    recommendations.push('Verifique se o fbclid está na URL ou se o cookie _fbc existe');
+  } else {
+    score += 30;
+  }
+  
+  // Validar FBP (importante - 20 pontos)
+  if (!data.fbp) {
+    issues.push('FBP não encontrado');
+    recommendations.push('Verifique se o cookie _fbp existe');
+  } else {
+    score += 20;
+  }
+  
+  // Validar dados de localização (10 pontos cada)
+  if (!data.ct || data.ct.length < 2) {
+    issues.push('Cidade inválida ou ausente');
+    recommendations.push('Use API de geolocalização ou dados do formulário');
+  } else {
+    score += 10;
+  }
+  
+  if (!data.st || data.st.length < 2) {
+    issues.push('Estado inválido ou ausente');
+    recommendations.push('Verifique o formato do estado (2 letras)');
+  } else {
+    score += 10;
+  }
+  
+  if (!data.zp || data.zp.length < 8) {
+    issues.push('CEP inválido ou ausente');
+    recommendations.push('Use CEP válido com 8 dígitos');
+  } else {
+    score += 10;
+  }
+  
+  // Validar external_id (10 pontos)
+  if (!data.external_id) {
+    issues.push('External ID não encontrado');
+    recommendations.push('Gere external_id a partir do email ou outro identificador único');
+  } else {
+    score += 10;
+  }
+  
+  // Validar GA Client ID (bônus - 10 pontos)
+  if (!data.ga_client_id) {
+    issues.push('GA Client ID não encontrado');
+    recommendations.push('Verifique se o Google Analytics está configurado corretamente');
+  } else {
+    score += 10;
+  }
+  
+  // Validar dados do usuário (se disponíveis)
+  if (data.em && data.em.includes('@')) {
+    score += 5; // Bônus para email
+  }
+  if (data.ph && data.ph.length >= 10) {
+    score += 5; // Bônus para telefone
+  }
+  if (data.fn && data.fn.length > 1) {
+    score += 3; // Bônus para nome
+  }
+  if (data.ln && data.ln.length > 1) {
+    score += 2; // Bônus para sobrenome
+  }
+  
+  const maxScore = 130; // Score máximo possível com todos os bônus
+  const isValid = score >= 70; // Considerar válido se score >= 70%
+  
+  return {
+    score: Math.round((score / maxScore) * 100),
+    issues,
+    recommendations,
+    isValid
+  };
+}
+
+/**
+ * Obtém todos os parâmetros de rastreamento necessários
+ * @returns Objeto completo com todos os dados de rastreamento
+ */
+export async function getAllTrackingParams(): Promise<{
+  fbc: string | null;
+  fbp: string | null;
+  ga_client_id: string | null;
+  external_id: string | null;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+}> {
+  const facebookCookies = getFacebookCookies();
+  const gaClientId = getGoogleClientId();
+  const locationData = await getLocationData();
+  
+  // Gerar external_id baseado no email se disponível (será sobrescrito quando houver email real)
+  const external_id = null; // Será preenchido dinamicamente
+  
+  return {
+    ...facebookCookies,
+    ga_client_id: gaClientId,
+    external_id,
+    ...locationData
+  };
+}
+
+/**
+ * Salva dados pessoais no localStorage para uso futuro
+ * @param personalData Dados pessoais para salvar
+ */
+export function savePersonalDataToLocalStorage(personalData: {
+  fn: string;
+  ln: string;
+  em: string;
+  ph: string;
+}): void {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    localStorage.setItem('user_personal_data', JSON.stringify(personalData));
+    console.log('💾 Dados pessoais salvos no localStorage:', personalData);
+  } catch (error) {
+    console.error('❌ Erro ao salvar dados pessoais no localStorage:', error);
+  }
+}
+
+/**
+ * Obtém dados pessoais do localStorage
+ * @returns Dados pessoais salvos ou objeto vazio
+ */
+export function getPersonalDataFromLocalStorage(): {
+  fn: string;
+  ln: string;
+  em: string;
+  ph: string;
+} {
+  if (typeof window === 'undefined') {
+    return { fn: '', ln: '', em: '', ph: '' };
+  }
+  
+  try {
+    const stored = localStorage.getItem('user_personal_data');
+    if (stored) {
+      const personalData = JSON.parse(stored);
+      console.log('📂 Dados pessoais recuperados do localStorage:', personalData);
+      return personalData;
+    }
+  } catch (error) {
+    console.error('❌ Erro ao recuperar dados pessoais do localStorage:', error);
+  }
+  
+  return { fn: '', ln: '', em: '', ph: '' };
+}
+
+/**
+ * Obtém dados pessoais de ALTA QUALIDADE com múltiplas fontes
+ * Prioridade: Formulário > localStorage > Vazio
+ * @returns Promise com dados pessoais da melhor fonte disponível
+ */
+export async function getEnhancedPersonalData(): Promise<{
+  fn: string;
+  ln: string;
+  em: string;
+  ph: string;
+}> {
+  // 1. Tentar obter dados do formulário (mais precisos se disponíveis)
+  const formData = getFormPersonalData();
+  if (formData && (formData.fn || formData.ln || formData.em || formData.ph)) {
+    console.log('🌍 Usando dados pessoais do formulário:', formData);
+    // Salvar no localStorage para uso futuro
+    savePersonalDataToLocalStorage(formData);
+    return formData;
+  }
+  
+  // 2. Tentar obter dados do localStorage
+  const localStorageData = getPersonalDataFromLocalStorage();
+  if (localStorageData.fn || localStorageData.ln || localStorageData.em || localStorageData.ph) {
+    console.log('📂 Usando dados pessoais do localStorage:', localStorageData);
+    return localStorageData;
+  }
+  
+  // 3. Retornar objeto vazio se não encontrar dados
+  console.log('ℹ️ Nenhum dado pessoal encontrado, retornando valores vazios');
+  return {
+    fn: '',
+    ln: '',
+    em: '',
+    ph: ''
+  };
+}
+
+export default {
+  getCookie,
+  getFacebookCookies,
+  getGoogleClientId,
+  getFormPersonalData,
+  getHighQualityPersonalData,
+  getFormLocationData,
+  getHighQualityLocationData,
+  savePersonalDataToLocalStorage,
+  getPersonalDataFromLocalStorage,
+  getEnhancedPersonalData,
+  getLocationData,
+  getCachedGeographicData,
+  validateDataQuality,
+  getAllTrackingParams,
+  captureFbclid,
+  captureUTMParameters,
+  getStoredUTMParameters,
+  addUTMHiddenFields,
+  buildURLWithUTM,
+  initializeTracking
+};

@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import StapeCustomContainer from "@/components/StapeCustomContainer";
+import GTMDataLayerChecker from "@/components/GTMDataLayerChecker";
+import FacebookPixelDebugger from "@/components/FacebookPixelDebugger";
 import UTMify from "@/components/UTMify";
 
 const geistSans = Geist({
@@ -47,6 +49,8 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
+        <GTMDataLayerChecker />
+        <FacebookPixelDebugger />
         <UTMify />
         {children}
         <Toaster />

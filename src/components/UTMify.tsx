@@ -1,61 +1,69 @@
-'use client';
+'use client'
 
-import { useEffect } from 'react';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { useEffect } from 'react'
 
 export default function UTMify() {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window !== 'undefined') {
+      // Verificar se o script já foi carregado
+      const existingScript = document.querySelector('script[src*="utmify.com.br"]')
+      if (existingScript) {
+        console.log('🔍 UTMify script já existe no DOM')
+        return
+      }
 
-    // Capturar parâmetros UTM da URL
-    const utmParams = {
-      utm_source: searchParams.get('utm_source') || '',
-      utm_medium: searchParams.get('utm_medium') || '',
-      utm_campaign: searchParams.get('utm_campaign') || '',
-      utm_content: searchParams.get('utm_content') || '',
-      utm_term: searchParams.get('utm_term') || ''
-    };
-
-    // Capturar fbclid
-    const fbclid = searchParams.get('fbclid') || '';
-
-    // Salvar UTM parameters no localStorage para uso futuro
-    if (Object.values(utmParams).some(value => value)) {
-      localStorage.setItem('utm_parameters', JSON.stringify(utmParams));
-      console.log('📊 UTM parameters salvos:', utmParams);
-    }
-
-    // Salvar fbclid no localStorage
-    if (fbclid) {
-      localStorage.setItem('fbclid', fbclid);
-      console.log('🔑 fbclid salvo:', fbclid);
-    }
-
-    // Se não tiver UTM na URL, tentar recuperar do localStorage
-    if (!Object.values(utmParams).some(value => value)) {
-      try {
-        const savedUtmParams = localStorage.getItem('utm_parameters');
-        if (savedUtmParams) {
-          const parsed = JSON.parse(savedUtmParams);
-          console.log('📊 UTM parameters recuperados do localStorage:', parsed);
+      // Criar e adicionar o script
+      const script = document.createElement('script')
+      script.src = 'https://cdn.utmify.com.br/utms.js'
+      script.setAttribute('data-utmify-prevent-xcod-sck', '')
+      script.setAttribute('data-utmify-prevent-subids', '')
+      script.async = true
+      script.defer = true
+      
+      // Adicionar tratamento de erro
+      script.onerror = () => {
+        console.error('❌ Erro ao carregar o script UTMify')
+        console.log('🔍 Verificando se o URL está correto...')
+        
+        // Tentar URL alternativo
+        const fallbackScript = document.createElement('script')
+        fallbackScript.src = 'https://cdn.utmify.com.br/scripts/utms/latest.js'
+        fallbackScript.setAttribute('data-utmify-prevent-xcod-sck', '')
+        fallbackScript.setAttribute('data-utmify-prevent-subids', '')
+        fallbackScript.async = true
+        fallbackScript.defer = true
+        
+        fallbackScript.onerror = () => {
+          console.error('❌ Falha ao carregar ambos os URLs do UTMify')
+          console.log('🔧 Possíveis soluções:')
+          console.log('   1. Verifique sua conexão com a internet')
+          console.log('   2. Verifique se o serviço UTMify está online')
+          console.log('   3. Verifique se não há bloqueadores de script')
         }
-      } catch (error) {
-        console.error('❌ Erro ao recuperar UTM parameters do localStorage:', error);
+        
+        fallbackScript.onload = () => {
+          console.log('✅ UTMify carregado com URL alternativo')
+        }
+        
+        document.head.appendChild(fallbackScript)
       }
-    }
-
-    // Se não tiver fbclid na URL, tentar recuperar do localStorage
-    if (!fbclid) {
-      const savedFbclid = localStorage.getItem('fbclid');
-      if (savedFbclid) {
-        console.log('🔑 fbclid recuperado do localStorage:', savedFbclid);
+      
+      script.onload = () => {
+        console.log('✅ UTMify carregado com sucesso')
+        
+        // Verificar se as funções UTMify estão disponíveis
+        setTimeout(() => {
+          if (typeof (window as any).utmify !== 'undefined') {
+            console.log('✅ Funções UTMify estão disponíveis')
+          } else {
+            console.warn('⚠️ Script UTMify carregado mas funções não encontradas')
+          }
+        }, 1000)
       }
+      
+      document.head.appendChild(script)
     }
+  }, [])
 
-  }, [pathname, searchParams]);
-
-  return null; // Componente não renderiza nada
+  return null
 }
