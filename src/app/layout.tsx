@@ -2,12 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
-import StapeCustomContainer from "@/components/StapeCustomContainer";
-import GTMDataLayerChecker from "@/components/GTMDataLayerChecker";
-import FacebookPixelDebugger from "@/components/FacebookPixelDebugger";
-import UTMify from "@/components/UTMify";
 import AdvancedTracking from "@/components/AdvancedTracking";
-import FacebookPixelScript from "@/components/FacebookPixelScript";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -46,8 +41,18 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <StapeCustomContainer />
-        <FacebookPixelScript />
+        {/* Google Tag Manager */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+              new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+              j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+              'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+              })(window,document,'script','dataLayer','GTM-PW4HF9WD');
+            `,
+          }}
+        />
         
         {/* Facebook Pixel Base Code */}
         <script
@@ -63,7 +68,7 @@ export default function RootLayout({
               'https://connect.facebook.net/en_US/fbevents.js');
               fbq('init', '714277868320104');
               fbq('track', 'PageView');
-              console.log('✅ Facebook Pixel loaded via script tag');
+              console.log('✅ Facebook Pixel carregado via layout');
             `,
           }}
         />
@@ -82,9 +87,16 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
-        <GTMDataLayerChecker />
-        <FacebookPixelDebugger />
-        <UTMify />
+        {/* Google Tag Manager (noscript) */}
+        <noscript>
+          <iframe
+            src="https://www.googletagmanager.com/ns.html?id=GTM-PW4HF9WD"
+            height="0"
+            width="0"
+            style={{ display: 'none', visibility: 'hidden' }}
+          />
+        </noscript>
+        
         <AdvancedTracking />
         {children}
         <Toaster />
