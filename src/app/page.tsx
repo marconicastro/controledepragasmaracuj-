@@ -3,23 +3,13 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, X, AlertTriangle, Clock, Shield, Star, Rocket, Phone, Mail, TrendingUp, Target, Zap, Award, Users, DollarSign, ArrowRight, PlayCircle, Download } from 'lucide-react';
-import PreCheckoutModal from '@/components/PreCheckoutModal';
-import { useTracking } from '@/hooks/use-tracking';
-import { buildURLWithUTM } from '@/lib/cookies';
-import META_CONFIG from '@/lib/metaConfig';
 
-export default function App() {
+function App() {
   const [timeLeft, setTimeLeft] = useState({
     hours: 0,
     minutes: 47,
     seconds: 0
   });
-
-  // Estado para controlar o modal de pré-checkout
-  const [isPreCheckoutModalOpen, setIsPreCheckoutModalOpen] = useState(false);
-
-  // Hook de tracking
-  const tracking = useTracking();
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -38,125 +28,12 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // Função para abrir o modal de pré-checkout
-  const openPreCheckoutModal = (event) => {
-    event.preventDefault();
-    setIsPreCheckoutModalOpen(true);
-  };
-
-  // Função para processar os dados do pré-checkout e redirecionar
-  const handlePreCheckoutSubmit = async (formData) => {
-    console.log('🚀 Dados recebidos do formulário:', formData);
-    
-    // Salvar dados do usuário usando nosso sistema de tracking
-    tracking.savePersonalData({
-      email: formData.email,
-      phone: formData.phone,
-      firstName: formData.fullName.split(' ')[0] || '',
-      lastName: formData.fullName.split(' ').slice(1).join(' ') || '',
-      city: formData.city,
-      state: formData.state,
-      zip: formData.cep,
-      country: 'BR'
-    });
-
-    // Disparar evento de InitiateCheckout
-    tracking.trackInitiateCheckout({
-      fullName: formData.fullName,
-      email: formData.email,
-      phone: formData.phone,
-      city: formData.city,
-      state: formData.state,
-      zip: formData.cep
-    });
-
-    // Construir parâmetros adicionais para o checkout
-    const additionalParams: Record<string, string> = {};
-    
-    // 1. Parâmetros de Pré-preenchimento
-    additionalParams['name'] = formData.fullName;
-    additionalParams['email'] = formData.email;
-    
-    // Para o Telefone: Formato esperado pela máscara "99 99999-9999"
-    const phoneClean = formData.phone.replace(/\D/g, '');
-    console.log('Telefone limpo:', phoneClean);
-    
-    if (phoneClean.length >= 10 && phoneClean.length <= 11) {
-      // Extrair DDD e número
-      const ddd = phoneClean.substring(0, 2);
-      const numeroCompleto = phoneClean.substring(2);
-      
-      console.log('DDD:', ddd);
-      console.log('Número completo:', numeroCompleto);
-      
-      // Formatar para o padrão da máscara: "77 99827-6042"
-      if (numeroCompleto.length === 9) {
-        // Celular com 9: 998276042 -> 77 99827-6042
-        const primeiraParte = numeroCompleto.substring(0, 5); // 99827
-        const segundaParte = numeroCompleto.substring(5); // 6042
-        const numeroFormatado = `${ddd} ${primeiraParte}-${segundaParte}`;
-        
-        console.log('Número formatado:', numeroFormatado);
-        additionalParams['phone_number'] = numeroFormatado;
-      } else if (numeroCompleto.length === 8) {
-        // Fixo: 98276042 -> 77 9827-6042
-        const primeiraParte = numeroCompleto.substring(0, 4); // 9827
-        const segundaParte = numeroCompleto.substring(4); // 6042
-        const numeroFormatado = `${ddd} ${primeiraParte}-${segundaParte}`;
-        
-        console.log('Número formatado:', numeroFormatado);
-        additionalParams['phone_number'] = numeroFormatado;
-      } else {
-        // Fallback: enviar DDD + número sem formatação
-        const numeroFormatado = `${ddd} ${numeroCompleto}`;
-        additionalParams['phone_number'] = numeroFormatado;
-      }
-    }
-
-    // 2. Parâmetros adicionais
-    if (formData.city && formData.city.trim() !== '') {
-      additionalParams['city'] = formData.city.trim();
-    }
-    
-    if (formData.state && formData.state.trim() !== '') {
-      additionalParams['state'] = formData.state.trim();
-    }
-    
-    if (formData.cep && formData.cep.replace(/\D/g, '').length === 8) {
-      const cleanCEP = formData.cep.replace(/\D/g, '');
-      additionalParams['zip'] = cleanCEP;
-    }
-
-    // Usar a função buildURLWithUTM para construir a URL final com todos os parâmetros
-    const finalUrlString = buildURLWithUTM(META_CONFIG.HOTMART.checkoutUrl, additionalParams);
-
-    // Log para depuração
-    console.log('=== URL FINAL COMPLETA COM UTM ===');
-    console.log('URL:', finalUrlString);
-    
-    // Parse da URL para log detalhado
-    const finalUrl = new URL(finalUrlString);
-    console.log('Parâmetros:');
-    finalUrl.searchParams.forEach((value, key) => {
-      console.log(`${key}:`, value);
-    });
-
-    // Fechar modal e redirecionar
-    setIsPreCheckoutModalOpen(false);
-    window.location.href = finalUrlString;
-  };
-
   const scrollToCheckout = () => {
-    const checkoutElement = document.getElementById('checkout');
-    if (checkoutElement) {
-      checkoutElement.scrollIntoView({ behavior: 'smooth' });
+    // Enviar evento de alta intenção antes de rolar
+    if (typeof window !== 'undefined' && window.sendTrackingEvent) {
+      window.sendTrackingEvent('high_quality_traffic');
     }
-  };
-
-  // Função principal de checkout (LEGADO - mantida para compatibilidade)
-  const handleHotmartCheckout = (event) => {
-    // Redirecionar para o novo fluxo com modal
-    openPreCheckoutModal(event);
+    document.getElementById('checkout').scrollIntoView({ behavior: 'smooth' });
   };
 
   return (
@@ -201,12 +78,6 @@ export default function App() {
                 alt="E-book Sistema de Controle de Trips" 
                 className="mx-auto max-w-full h-auto rounded-lg shadow-lg"
                 style={{ maxWidth: '200px' }}
-                draggable="false"
-                onContextMenu={(e) => e.preventDefault()}
-                onDragStart={(e) => e.preventDefault()}
-                onCopy={(e) => e.preventDefault()}
-                onCut={(e) => e.preventDefault()}
-                onPaste={(e) => e.preventDefault()}
               />
             </div>
 
@@ -237,7 +108,13 @@ export default function App() {
 
             {/* CTA Principal Mega Otimizado - Responsivo */}
             <Button 
-              onClick={scrollToCheckout}
+              onClick={() => {
+                // Enviar evento de alta intenção
+                if (typeof window !== 'undefined' && window.sendTrackingEvent) {
+                  window.sendTrackingEvent('high_quality_traffic');
+                }
+                scrollToCheckout();
+              }}
               className="bg-orange-500 hover:bg-orange-600 text-white font-black py-4 sm:py-6 px-6 sm:px-12 rounded-full text-base sm:text-xl md:text-2xl mb-4 sm:mb-6 transform hover:scale-105 transition-all duration-200 shadow-2xl animate-bounce w-full sm:w-auto"
             >
               <Rocket className="w-4 h-4 sm:w-6 sm:h-6 mr-2 sm:mr-3" />
@@ -260,8 +137,6 @@ export default function App() {
               </div>
               <div className="text-xs sm:text-sm mt-2">💳 Ou 12x de R$ 3,99 sem juros</div>
             </div>
-            
-  
           </div>
         </div>
       </div>
@@ -358,12 +233,6 @@ export default function App() {
                     alt="Travamento das ponteiras causado por trips" 
                     className="mt-2 sm:mt-3 mx-auto max-w-full h-auto rounded-lg shadow-md"
                     style={{ maxWidth: '200px' }}
-                    draggable="false"
-                    onContextMenu={(e) => e.preventDefault()}
-                    onDragStart={(e) => e.preventDefault()}
-                    onCopy={(e) => e.preventDefault()}
-                    onCut={(e) => e.preventDefault()}
-                    onPaste={(e) => e.preventDefault()}
                   />
                 </div>
                 <div>
@@ -373,12 +242,6 @@ export default function App() {
                     alt="Frutos deformados e manchados por trips" 
                     className="mt-2 sm:mt-3 mx-auto max-w-full h-auto rounded-lg shadow-md"
                     style={{ maxWidth: '200px' }}
-                    draggable="false"
-                    onContextMenu={(e) => e.preventDefault()}
-                    onDragStart={(e) => e.preventDefault()}
-                    onCopy={(e) => e.preventDefault()}
-                    onCut={(e) => e.preventDefault()}
-                    onPaste={(e) => e.preventDefault()}
                   />
                 </div>
                 <div>
@@ -388,12 +251,6 @@ export default function App() {
                     alt="Viroses que matam as plantas causadas por trips" 
                     className="mt-2 sm:mt-3 mx-auto max-w-full h-auto rounded-lg shadow-md"
                     style={{ maxWidth: '200px' }}
-                    draggable="false"
-                    onContextMenu={(e) => e.preventDefault()}
-                    onDragStart={(e) => e.preventDefault()}
-                    onCopy={(e) => e.preventDefault()}
-                    onCut={(e) => e.preventDefault()}
-                    onPaste={(e) => e.preventDefault()}
                   />
                 </div>
               </div>
@@ -432,7 +289,7 @@ export default function App() {
                     <div className="bg-green-500 text-white w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-sm sm:text-base">1</div>
                     <h4 className="font-bold text-green-700 text-sm sm:text-base">FASE OVOS (Dias 1-7)</h4>
                   </div>
-                  <p className="text-xs sm:text-sm text-gray-700">Eliminação dos ovos antes da eclosão com produto ovicida específico</p>
+                  <p className="text-xs sm:text-sm text-gray-700">Produto específico que penetra nos tecidos e elimina ovos antes da eclosão</p>
                 </div>
 
                 {/* Fase 2 */}
@@ -471,7 +328,13 @@ export default function App() {
             </div>
 
             <Button 
-              onClick={scrollToCheckout}
+              onClick={() => {
+                // Enviar evento de alta intenção
+                if (typeof window !== 'undefined' && window.sendTrackingEvent) {
+                  window.sendTrackingEvent('high_quality_traffic');
+                }
+                scrollToCheckout();
+              }}
               className="bg-yellow-400 hover:bg-yellow-500 text-green-800 font-black py-4 sm:py-6 px-6 sm:px-12 rounded-full text-base sm:text-xl transform hover:scale-105 transition-all duration-200 shadow-2xl w-full sm:w-auto"
             >
               <Target className="w-4 h-4 sm:w-6 sm:h-6 mr-2 sm:mr-3" />
@@ -539,11 +402,11 @@ export default function App() {
                   </div>
                 </div>
                 <p className="text-gray-700 italic mb-3 sm:mb-4 text-xs sm:text-sm">
-                  "Economizei R$ 73.500 em defensivos! O trips sumiu em 21 dias e não voltou mais. 
-                  Minha produção aumentou 89% na safra seguinte."
+                  "Em 28 dias eliminei o trips que me atormentava há 3 anos. Economizei R$ 8.000 
+                  só na primeira safra e minha produção aumentou 73%!"
                 </p>
                 <div className="bg-green-100 p-2 sm:p-3 rounded text-green-800 font-semibold text-xs sm:text-sm">
-                  💰 Economia: R$ 73.500 | 📈 Aumento: 89%
+                  💰 Economia: R$ 8.000 | 📈 Aumento: 73%
                 </div>
               </div>
 
@@ -551,11 +414,11 @@ export default function App() {
               <div className="bg-white p-4 sm:p-6 rounded-lg shadow-lg border-2 border-blue-200">
                 <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
                   <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-sm sm:text-base">
-                    MS
+                    AS
                   </div>
                   <div>
-                    <h4 className="font-bold text-gray-800 text-sm sm:text-base">Maria Silva</h4>
-                    <p className="text-gray-600 text-xs sm:text-sm">8 hectares - Ceará</p>
+                    <h4 className="font-bold text-gray-800 text-sm sm:text-base">Ana Santos</h4>
+                    <p className="text-gray-600 text-xs sm:text-sm">8 hectares - São Paulo</p>
                   </div>
                   <div className="flex text-yellow-400 ml-auto">
                     {[...Array(5)].map((_, i) => (
@@ -564,11 +427,11 @@ export default function App() {
                   </div>
                 </div>
                 <p className="text-gray-700 italic mb-3 sm:mb-4 text-xs sm:text-sm">
-                  "Estava gastando R$ 1.200 por hectare com trips. Agora gasto R$ 180 e tenho 
-                  controle total. Lucro líquido subiu R$ 8.160!"
+                  "Estava gastando R$ 1.500/mês em defensivos sem resultado. Com o sistema, 
+                  gasto R$ 300 e tenho controle total. Frutos perfeitos!"
                 </p>
                 <div className="bg-blue-100 p-2 sm:p-3 rounded text-blue-800 font-semibold text-xs sm:text-sm">
-                  💰 Economia mensal: R$ 8.160 | 🎯 Controle: 100%
+                  💰 Economia: R$ 14.400/ano | 🎯 Controle: 100%
                 </div>
               </div>
 
@@ -576,11 +439,11 @@ export default function App() {
               <div className="bg-white p-4 sm:p-6 rounded-lg shadow-lg border-2 border-purple-200">
                 <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
                   <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold text-sm sm:text-base">
-                    AS
+                    CR
                   </div>
                   <div>
-                    <h4 className="font-bold text-gray-800 text-sm sm:text-base">Antônio Santos</h4>
-                    <p className="text-gray-600 text-xs sm:text-sm">22 hectares - Pernambuco</p>
+                    <h4 className="font-bold text-gray-800 text-sm sm:text-base">Carlos Ribeiro</h4>
+                    <p className="text-gray-600 text-xs sm:text-sm">25 hectares - Minas Gerais</p>
                   </div>
                   <div className="flex text-yellow-400 ml-auto">
                     {[...Array(5)].map((_, i) => (
@@ -640,7 +503,13 @@ export default function App() {
             </div>
 
             <Button 
-              onClick={scrollToCheckout}
+              onClick={() => {
+                // Enviar evento de alta intenção
+                if (typeof window !== 'undefined' && window.sendTrackingEvent) {
+                  window.sendTrackingEvent('high_quality_traffic');
+                }
+                scrollToCheckout();
+              }}
               className="bg-yellow-400 hover:bg-yellow-500 text-red-600 font-black py-4 sm:py-6 px-6 sm:px-12 rounded-full text-base sm:text-xl transform hover:scale-105 transition-all duration-200 shadow-2xl animate-pulse w-full sm:w-auto"
             >
               <Zap className="w-4 h-4 sm:w-6 sm:h-6 mr-2 sm:mr-3" />
@@ -718,8 +587,22 @@ export default function App() {
                   href="https://pay.hotmart.com/I101398692S" 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  id="botao-compra-hotmart" 
-                  onClick={handleHotmartCheckout}
+                  onClick={() => {
+                    // Enviar evento de begin_checkout
+                    if (typeof window !== 'undefined' && window.sendTrackingEvent) {
+                      window.sendTrackingEvent('begin_checkout', {
+                        currency: 'BRL',
+                        value: 39.90,
+                        items: [{
+                          item_id: 'ebook-controle-trips',
+                          item_name: 'E-book Sistema de Controle de Trips',
+                          item_category: 'E-book',
+                          price: 39.90,
+                          quantity: 1
+                        }]
+                      });
+                    }
+                  }}
                   className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-4 sm:py-6 px-4 sm:px-6 rounded-lg text-base sm:text-xl transform hover:scale-105 transition-all duration-200 shadow-2xl inline-flex items-center justify-center gap-2 sm:gap-3"
                 >
                   <DollarSign className="w-4 h-4 sm:w-6 sm:h-6" />
@@ -758,7 +641,13 @@ export default function App() {
               </div>
               
               <Button 
-                onClick={scrollToCheckout}
+                onClick={() => {
+                  // Enviar evento de alta intenção
+                  if (typeof window !== 'undefined' && window.sendTrackingEvent) {
+                    window.sendTrackingEvent('high_quality_traffic');
+                  }
+                  scrollToCheckout();
+                }}
                 className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 sm:py-4 px-6 sm:px-8 rounded-full text-sm sm:text-lg w-full sm:w-auto"
               >
                 <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
@@ -783,13 +672,8 @@ export default function App() {
           </div>
         </div>
       </div>
-      
-      {/* Modal de Pré-Checkout */}
-      <PreCheckoutModal
-        isOpen={isPreCheckoutModalOpen}
-        onClose={() => setIsPreCheckoutModalOpen(false)}
-        onSubmit={handlePreCheckoutSubmit}
-      />
     </div>
   );
 }
+
+export default App;

@@ -1,11 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Suspense } from "react";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
-import { TrackingProvider } from "@/components/TrackingProvider";
-import StapeCustomContainer from "@/components/StapeCustomContainer";
-import UTMify from "@/components/UTMify";
+import Tracking from "@/components/tracking";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -18,21 +15,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Maracujá Zero Pragas - Sistema de Controle de Trips",
-  description: "Elimine o trips de vez e economize até R$ 5.000 por hectare com o método validado pela EMBRAPA.",
-  keywords: ["trips", "controle de trips", "maracujá", "pragas", "defensivos", "EMBRAPA"],
-  authors: [{ name: "Maracujá Zero Pragas" }],
+  title: "Sistema de Controle de Trips - Economize até R$ 5.000 por Hectare",
+  description: "Método validado pela EMBRAPA que elimina o trips de vez em 28 dias. Sistema de 4 fases com 94% de sucesso e economia de até R$ 5.000 por Hectare.",
+  keywords: ["trips", "controle de trips", "maracujá", "agricultura", "EMBRAPA", "defensivos", "pragas", "sistema 4 fases"],
   openGraph: {
-    title: "Maracujá Zero Pragas - Sistema de Controle de Trips",
-    description: "Elimine o trips de vez e economize até R$ 5.000 por hectare com o método validado pela EMBRAPA.",
-    url: "https://www.maracujazeropragas.com",
-    siteName: "Maracujá Zero Pragas",
+    title: "Sistema de Controle de Trips - Economize até R$ 5.000 por Hectare",
+    description: "Elimine o trips de vez com método científico validado pela EMBRAPA. Economize milhares em defensivos ineficazes.",
     type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Maracujá Zero Pragas - Sistema de Controle de Trips",
-    description: "Elimine o trips de vez e economize até R$ 5.000 por hectare com o método validado pela EMBRAPA.",
   },
 };
 
@@ -42,20 +31,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="pt-BR" suppressHydrationWarning>
       <head>
-        <StapeCustomContainer />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
-        <TrackingProvider>
-          <Suspense fallback={null}>
-            <UTMify />
-          </Suspense>
-          {children}
-          <Toaster />
-        </TrackingProvider>
+        <Tracking />
+        {children}
+        <Toaster />
       </body>
     </html>
   );
