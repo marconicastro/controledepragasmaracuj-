@@ -855,7 +855,7 @@ export async function getEnhancedPersonalData(): Promise<{
   };
 }
 
-export default {
+const cookies = {
   getCookie,
   getFacebookCookies,
   getGoogleClientId,
@@ -877,3 +877,5 @@ export default {
   buildURLWithUTM,
   initializeTracking
 };
+
+export default cookies;

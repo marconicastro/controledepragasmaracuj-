@@ -143,13 +143,15 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
   const onFormSubmit = async (data: CheckoutFormData) => {
     console.log('📤 PreCheckoutModal - Dados enviados:', data);
     setIsSubmitting(true);
+    
+    // Feedback visual imediato - não esperar processamento
     try {
       await onSubmit(data);
       console.log('✅ PreCheckoutModal - Envio concluído com sucesso');
       reset();
     } catch (error) {
       console.error('❌ Erro ao enviar formulário:', error);
-    } finally {
+      // Mesmo com erro, resetar estado de loading para permitir nova tentativa
       setIsSubmitting(false);
     }
   };

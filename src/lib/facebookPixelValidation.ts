@@ -261,9 +261,11 @@ export const FACEBOOK_EVENT_EXAMPLES = {
   }
 };
 
-export default {
+const facebookPixelValidation = {
   validateAndFixFacebookEvent,
   validateFacebookEventFormat,
   debugFacebookEvent,
   FACEBOOK_EVENT_EXAMPLES
 };
+
+export default facebookPixelValidation;

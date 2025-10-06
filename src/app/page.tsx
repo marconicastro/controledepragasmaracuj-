@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, X, AlertTriangle, Clock, Shield, Star, Rocket, Phone, Mail, TrendingUp, Target, Zap, Award, Users, DollarSign, ArrowRight, PlayCircle, Download, Bug } from 'lucide-react';
 import PreCheckoutModal from '@/components/PreCheckoutModal';
+import OptimizedImage from '@/components/OptimizedImage';
 import { getFacebookCookies, getGoogleClientId, buildURLWithUTM, getStoredUTMParameters } from '@/lib/cookies';
 import META_CONFIG from '@/lib/metaConfig';
 
@@ -44,200 +45,98 @@ export default function App() {
   const handlePreCheckoutSubmit = async (formData) => {
     console.log('🚀 Dados recebidos do formulário:', formData);
     
-    // Garantir que o nome completo esteja limpo e formatado corretamente
+    // Processamento rápido dos dados essenciais
     const cleanFullName = formData.fullName
       .trim()
-      .replace(/\s+/g, ' ') // Remove espaços extras
-      .replace(/[^a-zA-ZÀ-ÿ\s'-]/g, '') // Remove caracteres inválidos
-      .replace(/^-+|-+$/g, '') // Remove hífens do início/fim
-      .replace(/^'+|'+$/g, ''); // Remove apóstrofos do início/fim
+      .replace(/\s+/g, ' ')
+      .replace(/[^a-zA-ZÀ-ÿ\s'-]/g, '')
+      .replace(/^-+|-+$/g, '')
+      .replace(/^'+|'+$/g, '');
     
-    console.log('Nome limpo:', cleanFullName);
-    console.log('Email:', formData.email);
-    console.log('Telefone:', formData.phone);
-
-    // Capturar cookies necessários usando os utilitários
-    const { fbc, fbp } = getFacebookCookies();
-    const clientId = getGoogleClientId();
-    
-    // Capturar parâmetros UTM armazenados
-    const utmParams = getStoredUTMParameters();
-    console.log('📊 Parâmetros UTM capturados:', utmParams);
-
-    // Construir parâmetros adicionais para o checkout
+    // Capturar apenas parâmetros essenciais para o checkout
     const additionalParams: Record<string, string> = {};
-    
-    // 1. Parâmetros de Rastreamento (Manter)
-    if (clientId) {
-      additionalParams['cid'] = clientId;
-    }
-
-    // Montar parâmetros de rastreamento da Meta (sck)
-    const sckParams = new URLSearchParams();
-    if (fbp) {
-      sckParams.set('_fbp', fbp);
-    }
-    if (fbc) {
-      sckParams.set('_fbc', fbc);
-    }
-    const sckValue = sckParams.toString();
-    if (sckValue) {
-      additionalParams['sck'] = sckValue;
-    }
-
-    // 2. Parâmetros de Pré-preenchimento
     additionalParams['name'] = cleanFullName;
     additionalParams['email'] = formData.email;
     
-    // Para o Telefone: Formato esperado pela máscara "99 99999-9999"
+    // Formatação rápida do telefone
     const phoneClean = formData.phone.replace(/\D/g, '');
-    console.log('Telefone limpo:', phoneClean);
-    
     if (phoneClean.length >= 10 && phoneClean.length <= 11) {
-      // Extrair DDD e número
       const ddd = phoneClean.substring(0, 2);
       const numeroCompleto = phoneClean.substring(2);
       
-      console.log('DDD:', ddd);
-      console.log('Número completo:', numeroCompleto);
-      
-      // Formatar para o padrão da máscara: "77 99827-6042"
       if (numeroCompleto.length === 9) {
-        // Celular com 9: 998276042 -> 77 99827-6042
-        const primeiraParte = numeroCompleto.substring(0, 5); // 99827
-        const segundaParte = numeroCompleto.substring(5); // 6042
-        const numeroFormatado = `${ddd} ${primeiraParte}-${segundaParte}`;
-        
-        console.log('Número formatado:', numeroFormatado);
-        additionalParams['phone_number'] = numeroFormatado;
+        const primeiraParte = numeroCompleto.substring(0, 5);
+        const segundaParte = numeroCompleto.substring(5);
+        additionalParams['phone_number'] = `${ddd} ${primeiraParte}-${segundaParte}`;
       } else if (numeroCompleto.length === 8) {
-        // Fixo: 98276042 -> 77 9827-6042
-        const primeiraParte = numeroCompleto.substring(0, 4); // 9827
-        const segundaParte = numeroCompleto.substring(4); // 6042
-        const numeroFormatado = `${ddd} ${primeiraParte}-${segundaParte}`;
-        
-        console.log('Número formatado:', numeroFormatado);
-        additionalParams['phone_number'] = numeroFormatado;
-      } else {
-        // Fallback: enviar DDD + número sem formatação
-        const numeroFormatado = `${ddd} ${numeroCompleto}`;
-        additionalParams['phone_number'] = numeroFormatado;
+        const primeiraParte = numeroCompleto.substring(0, 4);
+        const segundaParte = numeroCompleto.substring(4);
+        additionalParams['phone_number'] = `${ddd} ${primeiraParte}-${segundaParte}`;
       }
     }
 
-    // 3. Parâmetros adicionais
-    if (formData.city && formData.city.trim() !== '') {
-      additionalParams['city'] = formData.city.trim();
-    }
-    
-    if (formData.state && formData.state.trim() !== '') {
-      additionalParams['state'] = formData.state.trim();
-    }
-    
-    if (formData.cep && formData.cep.replace(/\D/g, '').length === 8) {
-      const cleanCEP = formData.cep.replace(/\D/g, '');
-      additionalParams['zip'] = cleanCEP;
+    // Adicionar dados de localização se existirem
+    if (formData.city?.trim()) additionalParams['city'] = formData.city.trim();
+    if (formData.state?.trim()) additionalParams['state'] = formData.state.trim();
+    if (formData.cep?.replace(/\D/g, '').length === 8) {
+      additionalParams['zip'] = formData.cep.replace(/\D/g, '');
     }
 
-    // Usar a função buildURLWithUTM para construir a URL final com todos os parâmetros
+    // Construir URL final rapidamente
     const finalUrlString = buildURLWithUTM(META_CONFIG.HOTMART.checkoutUrl, additionalParams);
-
-    // Log para depuração
-    console.log('=== URL FINAL COMPLETA COM UTM ===');
-    console.log('URL:', finalUrlString);
     
-    // Parse da URL para log detalhado
-    const finalUrl = new URL(finalUrlString);
-    console.log('Parâmetros:');
-    finalUrl.searchParams.forEach((value, key) => {
-      console.log(`${key}:`, value);
-    });
+    // === CRÍTICO: Disparar initiate checkout ANTES do redirecionamento ===
+    try {
+      // Capturar dados essenciais para rastreamento
+      const { fbc, fbp } = getFacebookCookies();
+      const clientId = getGoogleClientId();
+      const utmParams = getStoredUTMParameters();
 
-    // Enriquecer dados do usuário para melhor rastreamento
-    const userData = {
-      email: formData.email,
-      phone: formData.phone.replace(/\D/g, ''),
-      firstName: formData.fullName.split(' ')[0] || '',
-      lastName: formData.fullName.split(' ').slice(1).join(' ') || '',
-      city: formData.city,
-      state: formData.state,
-      zip: formData.cep.replace(/\D/g, '')
-    };
+      // Dados essenciais para o evento initiate checkout
+      const userData = {
+        email: formData.email,
+        phone: phoneClean,
+        firstName: formData.fullName.split(' ')[0] || '',
+        lastName: formData.fullName.split(' ').slice(1).join(' ') || '',
+        city: formData.city,
+        state: formData.state,
+        zip: formData.cep?.replace(/\D/g, ''),
+        fbc, fbp, ga_client_id: clientId,
+        utm_source: utmParams.utm_source,
+        utm_medium: utmParams.utm_medium,
+        utm_campaign: utmParams.utm_campaign
+      };
 
-    // Obter dados de localização de alta qualidade para incluir no rastreamento
-    let locationData = {
-      city: formData.city,
-      state: formData.state,
-      zip: formData.cep.replace(/\D/g, ''),
-      country: 'BR'
-    };
+      console.log('🔥 Disparando initiate checkout ANTES do redirecionamento...');
 
-    const enrichedUserData = {
-      ...userData,
-      ...locationData, // Incluir dados geográficos!
-      fbc: fbc,
-      fbp: fbp,
-      ga_client_id: clientId,
-      external_id: formData.email ? formData.email.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() : undefined,
-      // Incluir UTM parameters para rastreamento
-      utm_source: utmParams.utm_source,
-      utm_medium: utmParams.utm_medium,
-      utm_campaign: utmParams.utm_campaign,
-      utm_content: utmParams.utm_content,
-      utm_term: utmParams.utm_term
-    };
+      // Disparar evento initiate checkout de forma síncrona
+      if (typeof window !== 'undefined' && window.advancedTracking) {
+        await window.advancedTracking.trackCheckout(userData);
+        console.log('✅ Initiate checkout disparado com sucesso');
+      }
 
-    console.log('📊 Dados do usuário enriquecidos para Meta:', enrichedUserData);
-    console.log('🌍 Dados geográficos incluídos:', {
-      city: enrichedUserData.city,
-      state: enrichedUserData.state,
-      zip: enrichedUserData.zip,
-      country: enrichedUserData.country
-    });
-    console.log('📧 Dados de contato:', {
-      email: enrichedUserData.email,
-      phone: enrichedUserData.phone,
-      firstName: enrichedUserData.firstName,
-      lastName: enrichedUserData.lastName
-    });
-    console.log('🔑 Dados de rastreamento:', {
-      fbc: enrichedUserData.fbc,
-      fbp: enrichedUserData.fbp,
-      ga_client_id: enrichedUserData.ga_client_id,
-      external_id: enrichedUserData.external_id
-    });
-    console.log('📊 Dados de UTM incluídos:', {
-      utm_source: enrichedUserData.utm_source,
-      utm_medium: enrichedUserData.utm_medium,
-      utm_campaign: enrichedUserData.utm_campaign,
-      utm_content: enrichedUserData.utm_content,
-      utm_term: enrichedUserData.utm_term
-    });
-
-    // Disparar evento de checkout com dados do usuário enriquecidos
-    if (typeof window !== 'undefined' && window.advancedTracking) {
-      await window.advancedTracking.trackCheckout(enrichedUserData);
-    }
-
-    // Salvar dados pessoais no localStorage para uso futuro em view_content e page_view
-    if (typeof window !== 'undefined') {
-      try {
+      // Salvar dados para uso futuro
+      if (typeof window !== 'undefined') {
         const personalDataToSave = {
-          fn: enrichedUserData.firstName,
-          ln: enrichedUserData.lastName,
-          em: enrichedUserData.email,
-          ph: enrichedUserData.phone
+          fn: userData.firstName,
+          ln: userData.lastName,
+          em: userData.email,
+          ph: userData.phone
         };
         localStorage.setItem('user_personal_data', JSON.stringify(personalDataToSave));
-        console.log('💾 Dados pessoais salvos para uso futuro em eventos:', personalDataToSave);
-      } catch (error) {
-        console.error('❌ Erro ao salvar dados pessoais no localStorage:', error);
       }
-    }
 
-    // Fechar modal e redirecionar
+    } catch (error) {
+      console.log('Erro no rastreamento (continuando redirecionamento):', error);
+    }
+    
+    // Fechar modal e redirecionar IMEDIATAMENTE após o evento
     setIsPreCheckoutModalOpen(false);
-    window.location.href = finalUrlString;
+    
+    // Pequeno delay apenas para garantir que o evento seja enviado
+    setTimeout(() => {
+      window.location.href = finalUrlString;
+    }, 50); // 50ms apenas para garantir envio do evento
   };
 
   const scrollToCheckout = () => {
@@ -289,17 +188,12 @@ export default function App() {
 
             {/* Logo do E-book */}
             <div className="mb-4 sm:mb-6">
-              <img 
+              <OptimizedImage 
                 src="/ebook-logo.webp" 
                 alt="E-book Sistema de Controle de Trips" 
                 className="mx-auto max-w-full h-auto rounded-lg shadow-lg"
                 style={{ maxWidth: '200px' }}
-                draggable="false"
-                onContextMenu={(e) => e.preventDefault()}
-                onDragStart={(e) => e.preventDefault()}
-                onCopy={(e) => e.preventDefault()}
-                onCut={(e) => e.preventDefault()}
-                onPaste={(e) => e.preventDefault()}
+                priority={true}
               />
             </div>
 
@@ -446,47 +340,29 @@ export default function App() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 text-sm sm:text-lg font-semibold">
                 <div>
                   <div>😰 Travamento das ponteiras</div>
-                  <img 
+                  <OptimizedImage 
                     src="/travamento-ponteiras.jpg" 
                     alt="Travamento das ponteiras causado por trips" 
                     className="mt-2 sm:mt-3 mx-auto max-w-full h-auto rounded-lg shadow-md"
                     style={{ maxWidth: '200px' }}
-                    draggable="false"
-                    onContextMenu={(e) => e.preventDefault()}
-                    onDragStart={(e) => e.preventDefault()}
-                    onCopy={(e) => e.preventDefault()}
-                    onCut={(e) => e.preventDefault()}
-                    onPaste={(e) => e.preventDefault()}
                   />
                 </div>
                 <div>
                   <div>🤢 Frutos deformados e manchados</div>
-                  <img 
+                  <OptimizedImage 
                     src="/frutos-manchados.jpg" 
                     alt="Frutos deformados e manchados por trips" 
                     className="mt-2 sm:mt-3 mx-auto max-w-full h-auto rounded-lg shadow-md"
                     style={{ maxWidth: '200px' }}
-                    draggable="false"
-                    onContextMenu={(e) => e.preventDefault()}
-                    onDragStart={(e) => e.preventDefault()}
-                    onCopy={(e) => e.preventDefault()}
-                    onCut={(e) => e.preventDefault()}
-                    onPaste={(e) => e.preventDefault()}
                   />
                 </div>
                 <div>
                   <div>💀 Viroses que matam a plantação</div>
-                  <img 
+                  <OptimizedImage 
                     src="/viroses-plantas.jpg" 
                     alt="Viroses que matam as plantas causadas por trips" 
                     className="mt-2 sm:mt-3 mx-auto max-w-full h-auto rounded-lg shadow-md"
                     style={{ maxWidth: '200px' }}
-                    draggable="false"
-                    onContextMenu={(e) => e.preventDefault()}
-                    onDragStart={(e) => e.preventDefault()}
-                    onCopy={(e) => e.preventDefault()}
-                    onCut={(e) => e.preventDefault()}
-                    onPaste={(e) => e.preventDefault()}
                   />
                 </div>
               </div>

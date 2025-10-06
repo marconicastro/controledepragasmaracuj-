@@ -66,7 +66,7 @@ export const META_CONFIG = {
   // Configurações de Hotmart
   HOTMART: {
     // URL base do checkout
-    checkoutUrl: 'https://pay.hotmart.com/I101398692S',
+    checkoutUrl: 'https://checkout.maracujazeropragas.com/VCCL1O8SCBWP',
     
     // Parâmetros obrigatórios para pré-preenchimento
     requiredParams: ['name', 'email'],

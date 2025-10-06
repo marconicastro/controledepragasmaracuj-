@@ -102,11 +102,11 @@ export default function AdvancedTracking() {
   const viewContentHasBeenTracked = useRef(false);
 
   useEffect(() => {
-    // Dispara o view_content apenas uma vez após 3 segundos (para não conflitar com PageView do layout)
+    // Dispara o view_content apenas uma vez após 5 segundos (otimizado para performance)
     const timer = setTimeout(async () => {
       console.log('🎯 Disparando ViewContent único...');
       await trackViewContent(viewContentHasBeenTracked);
-    }, 3000);
+    }, 5000);
 
     // Expondo as funções essenciais na janela global
     if (typeof window !== 'undefined') {

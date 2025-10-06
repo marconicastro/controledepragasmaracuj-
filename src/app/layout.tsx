@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import AdvancedTracking from "@/components/AdvancedTracking";
@@ -41,8 +42,20 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* Performance optimizations */}
+        <link rel="preconnect" href="https://connect.facebook.net" />
+        <link rel="preconnect" href="https://www.googletagmanager.com" />
+        <link rel="dns-prefetch" href="//www.facebook.com" />
+        <link rel="dns-prefetch" href="//ipapi.co" />
+        <link rel="prefetch" href="/ebook-logo-optimized.webp" />
+        <link rel="prefetch" href="/viroses-plantas-optimized.webp" />
+        <link rel="prefetch" href="/travamento-ponteiras-optimized.webp" />
+        <link rel="prefetch" href="/frutos-manchados-optimized.webp" />
+        
         {/* Google Tag Manager */}
-        <script
+        <Script
+          id="gtm-script"
+          strategy="afterInteractive"
           dangerouslySetInnerHTML={{
             __html: `
               (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
@@ -54,21 +67,23 @@ export default function RootLayout({
           }}
         />
         
-        {/* Facebook Pixel Base Code */}
+        {/* Facebook Pixel Base Code - Deferred */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              !function(f,b,e,v,n,t,s)
-              {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-              n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-              if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-              n.queue=[];t=b.createElement(e);t.async=!0;
-              t.src=v;s=b.getElementsByTagName(e)[0];
-              s.parentNode.insertBefore(t,s)}(window, document,'script',
-              'https://connect.facebook.net/en_US/fbevents.js');
-              fbq('init', '714277868320104');
-              fbq('track', 'PageView');
-              console.log('✅ Facebook Pixel carregado via layout');
+              setTimeout(function() {
+                !function(f,b,e,v,n,t,s)
+                {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+                n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+                if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+                n.queue=[];t=b.createElement(e);t.async=!0;
+                t.src=v;s=b.getElementsByTagName(e)[0];
+                s.parentNode.insertBefore(t,s)}(window, document,'script',
+                'https://connect.facebook.net/en_US/fbevents.js');
+                fbq('init', '714277868320104');
+                fbq('track', 'PageView');
+                console.log('✅ Facebook Pixel carregado via layout');
+              }, 2000);
             `,
           }}
         />
