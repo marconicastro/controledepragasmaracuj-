@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import { eventManager } from '@/lib/eventManager';
-import { getAllTrackingParams, initializeTracking, getHighQualityLocationData, getHighQualityPersonalData } from '@/lib/cookies';
+import { getAllTrackingParams, initializeTracking, getHighQualityLocationData, getHighQualityPersonalData, getFacebookCookies, captureFbclid } from '@/lib/cookies';
 
 // --- FUNÇÕES ESSENCIAIS APENAS ---
 
@@ -55,6 +55,10 @@ export const trackCheckout = async (userData: any) => {
 
   const locationData = await getHighQualityLocationData();
   const personalData = await getHighQualityPersonalData();
+  
+  // 🌍 Capturar endereço IP para otimização
+  const { getUserIP } = await import('@/lib/cookies');
+  const userIP = await getUserIP();
 
   // Preparar dados do usuário com prioridade para dados do formulário
   const formattedUserData = {
@@ -69,7 +73,10 @@ export const trackCheckout = async (userData: any) => {
     fbc: userData.fbc,
     fbp: userData.fbp,
     ga_client_id: userData.ga_client_id,
-    external_id: userData.external_id
+    external_id: userData.external_id,
+    // 🌍 Adicionar IP e User Agent para máxima otimização
+    ip: userIP,
+    user_agent: typeof window !== 'undefined' ? window.navigator.userAgent : undefined
   };
 
   // Salvar os dados pessoais no localStorage para uso futuro
@@ -257,7 +264,7 @@ export default function AdvancedTracking() {
           console.log('- viewContent já trackeado:', viewContentHasBeenTracked.current);
           
           // Verificar cookies Facebook
-          const { fbc, fbp } = require('@/lib/cookies').getFacebookCookies();
+          const { fbc, fbp } = getFacebookCookies();
           console.log('📊 Status dos cookies Facebook:');
           console.log('- _fbc:', fbc || '❌ Não encontrado');
           console.log('- _fbp:', fbp || '❌ Não encontrado');
@@ -279,7 +286,6 @@ export default function AdvancedTracking() {
         // Função para testar captura de fbclid
         testFbclidCapture: () => {
           console.log('🧪 Testando captura de fbclid...');
-          const { captureFbclid, getFacebookCookies } = require('@/lib/cookies');
           captureFbclid();
           setTimeout(() => {
             const { fbc, fbp } = getFacebookCookies();

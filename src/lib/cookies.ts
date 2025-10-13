@@ -22,10 +22,54 @@ export function getFacebookCookies(): {
   fbc: string | null;
   fbp: string | null;
 } {
+  const fbc = getCookie('_fbc');
+  const fbp = getCookie('_fbp');
+  
+  // DEBUG: Log detalhado dos cookies
+  console.log('🔍 DEBUG - Status dos cookies Facebook:');
+  console.log('- _fbc:', fbc || '❌ Não encontrado');
+  console.log('- _fbp:', fbp || '❌ Não encontrado');
+  console.log('- Todos os cookies:', document.cookie);
+  
   return {
-    fbc: getCookie('_fbc'),
-    fbp: getCookie('_fbp')
+    fbc: fbc,
+    fbp: fbp
   };
+}
+
+/**
+ * Garante que o cookie _fbp (Facebook Pixel ID) exista
+ * Se não existir, cria um novo no formato padrão do Facebook
+ */
+export function ensureFbpCookie(): void {
+  if (typeof window === 'undefined') return;
+  
+  // Verificar se já temos o cookie _fbp
+  const existingFbp = getCookie('_fbp');
+  if (existingFbp) {
+    console.log('✅ Cookie _fbp já existe:', existingFbp);
+    return;
+  }
+  
+  // Criar o cookie _fbp no formato padrão do Facebook
+  // Formato: fb.1.{timestamp}.{random}
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(2, 15);
+  const fbpValue = `fb.1.${timestamp}.${random}`;
+  
+  // Definir o cookie com expiração de 90 dias
+  const expirationDate = new Date();
+  expirationDate.setDate(expirationDate.getDate() + 90);
+  
+  document.cookie = `_fbp=${fbpValue}; expires=${expirationDate.toUTCString()}; path=/; domain=${window.location.hostname}; SameSite=Lax`;
+  
+  console.log('🎯 Cookie _fbp criado com sucesso:', fbpValue);
+  
+  // Verificar se o cookie foi salvo corretamente
+  setTimeout(() => {
+    const savedFbp = getCookie('_fbp');
+    console.log('✅ Cookie _fbp salvo e recuperado:', savedFbp);
+  }, 100);
 }
 
 /**
@@ -235,6 +279,9 @@ export function initializeTracking(): void {
   
   console.log('🚀 Inicializando captura de parâmetros de rastreamento...');
   
+  // ⚡ CRÍTICO: Garantir que _fbp exista sempre
+  ensureFbpCookie();
+  
   // Capturar fbclid e criar cookie _fbc
   captureFbclid();
   
@@ -252,6 +299,55 @@ export function initializeTracking(): void {
     const value = utmParams[key as keyof typeof utmParams];
     console.log(`   - ${key}:`, value || 'Não encontrado');
   });
+}
+
+/**
+ * Obtém o endereço IP do usuário
+ * @returns Promise com o IP ou null se não for possível obter
+ */
+export async function getUserIP(): Promise<string | null> {
+  try {
+    console.log('🌍 Buscando endereço IP do usuário...');
+    
+    // Tentar múltiplas APIs para obter o IP
+    const apis = [
+      'https://api.ipify.org?format=json',
+      'https://ipapi.co/json/',
+      'https://api.ip.sb/ip',
+      'https://httpbin.org/ip'
+    ];
+    
+    for (const api of apis) {
+      try {
+        const response = await fetch(api, {
+          method: 'GET',
+          mode: 'cors',
+          cache: 'no-cache',
+          timeout: 5000
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          const ip = data.ip || data.ip_address || (typeof data === 'string' ? data.trim() : null);
+          
+          if (ip && /^\d+\.\d+\.\d+\.\d+$/.test(ip)) {
+            console.log('✅ Endereço IP obtido com sucesso:', ip);
+            return ip;
+          }
+        }
+      } catch (error) {
+        console.log(`❌ Falha na API ${api}:`, error.message);
+        continue;
+      }
+    }
+    
+    console.log('⚠️ Não foi possível obter o endereço IP');
+    return null;
+    
+  } catch (error) {
+    console.error('❌ Erro ao buscar endereço IP:', error);
+    return null;
+  }
 }
 
 /**
