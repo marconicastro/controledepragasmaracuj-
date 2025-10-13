@@ -10,6 +10,7 @@ const nextConfig = {
     formats: ['image/webp', 'image/avif'],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    minimumCacheTTL: 60 * 60 * 24 * 30, // 30 dias
   },
   
   // Otimizações de compilação
@@ -20,10 +21,49 @@ const nextConfig = {
   // Otimizações de empacotamento
   experimental: {
     optimizePackageImports: ['lucide-react'],
+    optimizeCss: true,
   },
   
   // Configurações de compressão
   compress: true,
+  
+  // Headers de cache otimizados
+  async headers() {
+    return [
+      {
+        source: '/_next/static/(.*)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
+        source: '/(.*\\.(webp|jpg|jpeg|png|gif|svg|ico))',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
+        source: '/fonts/(.*)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+    ];
+  },
+  
+  // Redirecionamentos para otimização
+  async redirects() {
+    return [];
+  },
   
   webpack: (config, { dev }) => {
     if (dev) {
@@ -31,6 +71,21 @@ const nextConfig = {
         ignored: ['**/*'],
       };
     }
+    
+    // Otimizações de produção
+    if (!dev) {
+      config.optimization.splitChunks = {
+        chunks: 'all',
+        cacheGroups: {
+          vendor: {
+            test: /[\\/]node_modules[\\/]/,
+            name: 'vendors',
+            chunks: 'all',
+          },
+        },
+      };
+    }
+    
     return config;
   },
   

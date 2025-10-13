@@ -40,7 +40,7 @@ const trackViewContent = async (viewContentHasBeenTracked: any) => {
   const result = await eventManager.sendViewContent(userData);
   
   if (result.success) {
-    console.log('✅ ViewContent enviado com sucesso:', result);
+    console.log('✅ ViewContent enviado com sucesso (canal único):', result);
     viewContentHasBeenTracked.current = true;
   } else {
     console.error('❌ Falha ao enviar ViewContent');
@@ -91,7 +91,7 @@ export const trackCheckout = async (userData: any) => {
   const result = await eventManager.sendInitiateCheckout(formattedUserData);
   
   if (result.success) {
-    console.log('✅ InitiateCheckout enviado com sucesso:', result);
+    console.log('✅ InitiateCheckout enviado com sucesso (canal único):', result);
   } else {
     console.error('❌ Falha ao enviar InitiateCheckout');
   }
@@ -100,8 +100,64 @@ export const trackCheckout = async (userData: any) => {
 // --- COMPONENTE PRINCIPAL SIMPLIFICADO ---
 export default function AdvancedTracking() {
   const viewContentHasBeenTracked = useRef(false);
+  const pageViewHasBeenTracked = useRef(false);
 
   useEffect(() => {
+    // Otimizado: iniciar tracking sem bloquear renderização
+    const initTimer = requestIdleCallback(() => {
+      // Adicionar logs detalhados para debug do PageView
+      console.log('🔍 Debug do PageView (após idle callback):');
+      console.log('- window.dataLayer existe:', !!window.dataLayer);
+      console.log('- window.fbq existe:', !!window.fbq);
+      console.log('- pageViewHasBeenTracked:', pageViewHasBeenTracked.current);
+      console.log('- dataLayer content:', window.dataLayer);
+      
+      // Dispara PageView via GTM assim que o componente monta
+      if (!pageViewHasBeenTracked.current && typeof window !== 'undefined' && window.dataLayer) {
+        console.log('📄 Enviando PageView único via GTM...');
+        
+        // Adicionar log detalhado antes de enviar
+        const pageViewEvent = {
+          event: 'PageView',
+          event_id: `pageview_${Date.now()}_gtm`,
+          page_title: document.title,
+          page_location: window.location.href,
+          page_referrer: document.referrer
+        };
+        
+        console.log('📤 Evento PageView que será enviado:', pageViewEvent);
+        
+        window.dataLayer.push(pageViewEvent);
+        pageViewHasBeenTracked.current = true;
+        console.log('✅ PageView enviado via GTM');
+        console.log('📊 dataLayer após PageView:', window.dataLayer);
+        
+        // Verificar se o evento foi realmente adicionado
+        setTimeout(() => {
+          console.log('🔍 Verificando se PageView está no dataLayer...');
+          const hasPageView = window.dataLayer?.some(item => item.event === 'PageView');
+          console.log('- PageView encontrado no dataLayer:', hasPageView);
+          
+          // Fallback: Se GTM não funcionou, enviar diretamente via Facebook Pixel
+          if (!hasPageView && typeof window !== 'undefined' && window.fbq) {
+            console.log('🚨 GTM não funcionou, usando fallback direto via Facebook Pixel...');
+            window.fbq('track', 'PageView', {}, {
+              eventID: `pageview_${Date.now()}_fb_fallback`
+            });
+            console.log('✅ PageView enviado via Facebook Pixel (fallback)');
+          } else if (!hasPageView) {
+            console.log('❌ Facebook Pixel também não disponível para fallback');
+          }
+        }, 2000);
+      } else {
+        console.log('❌ Condições para PageView não atendidas:', {
+          hasWindow: typeof window !== 'undefined',
+          hasDataLayer: !!window.dataLayer,
+          alreadyTracked: pageViewHasBeenTracked.current
+        });
+      }
+    }, { timeout: 3000 }); // Timeout de 3 segundos como fallback
+
     // Dispara o view_content apenas uma vez após 5 segundos (otimizado para performance)
     const timer = setTimeout(async () => {
       console.log('🎯 Disparando ViewContent único...');
@@ -131,11 +187,58 @@ export default function AdvancedTracking() {
         testViewContent: () => {
           console.log('🧪 Testando ViewContent...');
           trackViewContent(viewContentHasBeenTracked);
+        },
+        // Função para testar PageView manualmente
+        testPageView: () => {
+          console.log('🧪 Testando PageView...');
+          if (typeof window !== 'undefined' && window.dataLayer) {
+            const testEvent = {
+              event: 'PageView',
+              event_id: `pageview_test_${Date.now()}_gtm`,
+              page_title: document.title,
+              page_location: window.location.href,
+              page_referrer: document.referrer,
+              test_mode: true
+            };
+            
+            console.log('📤 Enviando PageView de teste:', testEvent);
+            window.dataLayer.push(testEvent);
+            console.log('✅ PageView de teste enviado via GTM');
+            
+            // Testar fallback também
+            setTimeout(() => {
+              if (window.fbq) {
+                console.log('🧪 Testando PageView via Facebook Pixel direto...');
+                window.fbq('track', 'PageView', {}, {
+                  eventID: `pageview_test_${Date.now()}_fb_direct`
+                });
+                console.log('✅ PageView de teste enviado via Facebook Pixel direto');
+              }
+            }, 1000);
+          } else {
+            console.log('❌ dataLayer não disponível para teste');
+          }
+        },
+        // Função para verificar status do tracking
+        checkTrackingStatus: () => {
+          console.log('📊 Status do Tracking:');
+          console.log('- dataLayer:', !!window.dataLayer);
+          console.log('- fbq:', !!window.fbq);
+          console.log('- gtag:', !!window.gtag);
+          console.log('- pageView já trackeado:', pageViewHasBeenTracked.current);
+          console.log('- viewContent já trackeado:', viewContentHasBeenTracked.current);
+          if (window.dataLayer) {
+            console.log('- dataLayer items:', window.dataLayer.length);
+            console.log('- dataLayer content:', window.dataLayer);
+          }
         }
       };
     }
 
-    return () => clearTimeout(timer);
+    return () => {
+      if (initTimer) cancelIdleCallback(initTimer);
+      clearTimeout(timer);
+    };
   }, []);
 
   return null; // Componente invisível
@@ -145,11 +248,15 @@ export default function AdvancedTracking() {
 declare global {
   interface Window {
     dataLayer?: any[];
+    fbq?: any;
+    gtag?: any;
     advancedTracking?: {
       trackCheckout: (userData: any) => Promise<void>;
       trackViewContentWithUserData: (userData: any) => Promise<void>;
       testCheckout: () => void;
       testViewContent: () => void;
+      testPageView: () => void;
+      checkTrackingStatus: () => void;
     };
   }
 }

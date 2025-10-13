@@ -42,17 +42,21 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Performance optimizations */}
+        {/* Performance optimizations - Preconnects críticos */}
         <link rel="preconnect" href="https://connect.facebook.net" />
         <link rel="preconnect" href="https://www.googletagmanager.com" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link rel="dns-prefetch" href="//www.facebook.com" />
         <link rel="dns-prefetch" href="//ipapi.co" />
-        <link rel="prefetch" href="/ebook-logo-optimized.webp" />
-        <link rel="prefetch" href="/viroses-plantas-optimized.webp" />
-        <link rel="prefetch" href="/travamento-ponteiras-optimized.webp" />
-        <link rel="prefetch" href="/frutos-manchados-optimized.webp" />
         
-        {/* Google Tag Manager */}
+        {/* Prefetch de recursos críticos */}
+        <link rel="prefetch" href="/ebook-logo.webp" />
+        <link rel="prefetch" href="/frutos-manchados.jpg" />
+        <link rel="prefetch" href="/travamento-ponteiras.jpg" />
+        <link rel="prefetch" href="/viroses-plantas.jpg" />
+        
+        {/* Google Tag Manager - Otimizado */}
         <Script
           id="gtm-script"
           strategy="afterInteractive"
@@ -67,34 +71,34 @@ export default function RootLayout({
           }}
         />
         
-        {/* Facebook Pixel Base Code - Deferred */}
-        <script
+        {/* Facebook Pixel Base Code - Otimizado e assíncrono */}
+        <Script
+          id="fb-pixel-script"
+          strategy="afterInteractive"
           dangerouslySetInnerHTML={{
             __html: `
-              setTimeout(function() {
-                !function(f,b,e,v,n,t,s)
-                {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-                n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-                if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-                n.queue=[];t=b.createElement(e);t.async=!0;
-                t.src=v;s=b.getElementsByTagName(e)[0];
-                s.parentNode.insertBefore(t,s)}(window, document,'script',
-                'https://connect.facebook.net/en_US/fbevents.js');
-                fbq('init', '714277868320104');
-                fbq('track', 'PageView');
-                console.log('✅ Facebook Pixel carregado via layout');
-              }, 2000);
+              !function(f,b,e,v,n,t,s)
+              {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+              n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+              if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+              n.queue=[];t=b.createElement(e);t.async=!0;
+              t.src=v;s=b.getElementsByTagName(e)[0];
+              s.parentNode.insertBefore(t,s)}(window, document,'script',
+              'https://connect.facebook.net/en_US/fbevents.js');
+              fbq('init', '714277868320104');
+              // PageView será gerenciado pelo GTM e AdvancedTracking
+              console.log('✅ Facebook Pixel carregado via layout (sem PageView)');
             `,
           }}
         />
         
-        {/* Facebook Pixel Noscript */}
+        {/* Facebook Pixel Noscript - SEM PageView */}
         <noscript>
           <img 
             height="1" 
             width="1" 
             style={{ display: 'none' }}
-            src="https://www.facebook.com/tr?id=714277868320104&ev=PageView&noscript=1"
+            src="https://www.facebook.com/tr?id=714277868320104&noscript=1"
             alt="Facebook Pixel"
           />
         </noscript>

@@ -144,14 +144,22 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
     console.log('📤 PreCheckoutModal - Dados enviados:', data);
     setIsSubmitting(true);
     
-    // Feedback visual imediato - não esperar processamento
+    // Feedback visual imediato e processamento em background
     try {
-      await onSubmit(data);
-      console.log('✅ PreCheckoutModal - Envio concluído com sucesso');
-      reset();
+      // Iniciar processamento imediatamente sem esperar
+      onSubmit(data).catch(error => {
+        console.error('❌ Erro no processamento:', error);
+      });
+      
+      console.log('✅ PreCheckoutModal - Processamento iniciado com sucesso');
+      
+      // Pequeno delay apenas para feedback visual (50ms)
+      setTimeout(() => {
+        reset();
+      }, 50);
+      
     } catch (error) {
       console.error('❌ Erro ao enviar formulário:', error);
-      // Mesmo com erro, resetar estado de loading para permitir nova tentativa
       setIsSubmitting(false);
     }
   };
@@ -166,14 +174,12 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
   // Adicionar campos ocultos de UTM quando o modal abrir
   React.useEffect(() => {
     if (isOpen) {
-      // Pequeno delay para garantir que o formulário esteja no DOM
-      setTimeout(() => {
-        const form = document.querySelector('form');
-        if (form) {
-          addUTMHiddenFields(form);
-          console.log('📝 Campos UTM adicionados ao formulário do pré-checkout');
-        }
-      }, 100);
+      // Adicionar campos UTM imediatamente - sem delay necessário
+      const form = document.querySelector('form');
+      if (form) {
+        addUTMHiddenFields(form);
+        console.log('📝 Campos UTM adicionados ao formulário do pré-checkout');
+      }
     }
   }, [isOpen]);
 
@@ -305,13 +311,13 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
           {/* Botão de Envio */}
           <Button 
             type="submit" 
-            className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 text-lg"
+            className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 text-lg transition-all duration-200"
             disabled={isSubmitting}
           >
             {isSubmitting ? (
               <div className="flex items-center gap-2">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                Processando...
+                <span className="animate-pulse">Redirecionando...</span>
               </div>
             ) : (
               <div className="flex items-center gap-2">

@@ -22,6 +22,7 @@ interface EventConfig {
   enableServerSide: boolean;
   enableGTM: boolean;
   deduplicationWindow: number;
+  primaryChannel: 'gtm' | 'server' | 'fb'; // Canal primário único
 }
 
 class EventManager {
@@ -32,15 +33,16 @@ class EventManager {
   private constructor() {
     this.config = {
       enableClientSide: true,
-      enableServerSide: true,
-      enableGTM: true,
+      enableServerSide: false, // Desativado para evitar duplicação
+      enableGTM: false, // Desativado para evitar duplicação
+      primaryChannel: 'fb', // Apenas Facebook Pixel direto
       deduplicationWindow: 5 * 60 * 1000 // 5 minutos
     };
 
     // Limpar cache periodicamente
     setInterval(() => this.cleanupCache(), 60000);
     
-    console.log('🎯 EventManager simplificado inicializado');
+    console.log('🎯 EventManager configurado para canal único:', this.config.primaryChannel);
   }
 
   public static getInstance(): EventManager {
@@ -57,10 +59,19 @@ class EventManager {
   }
 
   private registerEvent(eventId: string, eventName: string, channel: 'client' | 'server' | 'gtm' | 'fb', data: any): void {
+    // Verificar duplicação por EventID dentro da janela de deduplicação
+    const now = Date.now();
+    const existingEvent = this.eventCache.get(eventId);
+    
+    if (existingEvent && (now - existingEvent.timestamp) < this.config.deduplicationWindow) {
+      console.log(`⚠️ Evento duplicado detectado e ignorado: ${eventName} (${channel}) - ID: ${eventId}`);
+      return;
+    }
+
     const record: EventRecord = {
       eventId,
       eventName,
-      timestamp: Date.now(),
+      timestamp: now,
       channel,
       data,
       status: 'pending'
@@ -212,55 +223,46 @@ class EventManager {
   public async sendEvent(
     eventName: string,
     data: any
-  ): Promise<{ success: boolean; eventId: string; channels: string[] }> {
-    console.group(`🎯 EventManager - ${eventName}`);
+  ): Promise<{ success: boolean; eventId: string; channel: string }> {
+    console.group(`🎯 EventManager - ${eventName} (canal único: ${this.config.primaryChannel})`);
     
     try {
-      const channels: string[] = [];
-      const results: boolean[] = [];
+      const eventId = this.generateEventId(eventName, this.config.primaryChannel);
+      this.registerEvent(eventId, eventName, this.config.primaryChannel, data);
+      
+      let result = false;
+      let channel = '';
 
-      // Enviar via GTM
-      if (this.config.enableGTM) {
-        const gtmEventId = this.generateEventId(eventName, 'gtm');
-        this.registerEvent(gtmEventId, eventName, 'gtm', data);
-        
-        const gtmResult = await this.sendGTM(gtmEventId, eventName, data);
-        results.push(gtmResult);
-        if (gtmResult) channels.push('gtm');
+      // Enviar APENAS pelo canal primário configurado
+      switch (this.config.primaryChannel) {
+        case 'gtm':
+          result = await this.sendGTM(eventId, eventName, data);
+          channel = 'gtm';
+          break;
+        case 'server':
+          result = await this.sendServerSide(eventId, eventName, data);
+          channel = 'server';
+          break;
+        case 'fb':
+          result = await this.sendFacebookPixelDirect(eventId, eventName, data);
+          channel = 'fb';
+          break;
+        default:
+          console.error(`❌ Canal primário inválido: ${this.config.primaryChannel}`);
+          return { success: false, eventId: '', channel: '' };
       }
 
-      // Enviar via Server-side
-      if (this.config.enableServerSide) {
-        const serverEventId = this.generateEventId(eventName, 'server');
-        this.registerEvent(serverEventId, eventName, 'server', data);
-        
-        const serverResult = await this.sendServerSide(serverEventId, eventName, data);
-        results.push(serverResult);
-        if (serverResult) channels.push('server');
-      }
-
-      // Enviar via Facebook Pixel direto
-      const fbEventId = this.generateEventId(eventName, 'fb');
-      this.registerEvent(fbEventId, eventName, 'fb', data);
-      
-      const fbResult = await this.sendFacebookPixelDirect(fbEventId, eventName, data);
-      results.push(fbResult);
-      if (fbResult) channels.push('fb');
-
-      const success = results.some(result => result);
-      
-      console.log(`📊 Resultado do envio: ${eventName}`, {
-        success,
-        channels,
-        successfulAttempts: results.filter(r => r).length,
-        totalAttempts: results.length
+      console.log(`📊 Resultado do envio único: ${eventName}`, {
+        success: result,
+        channel,
+        eventId
       });
 
-      return { success, eventId: channels.join('_'), channels };
+      return { success: result, eventId, channel };
 
     } catch (error) {
       console.error(`❌ Erro crítico no EventManager para ${eventName}:`, error);
-      return { success: false, eventId: '', channels: [] };
+      return { success: false, eventId: '', channel: '' };
     } finally {
       console.groupEnd();
     }
@@ -269,7 +271,7 @@ class EventManager {
   /**
    * Métodos específicos para eventos essenciais APENAS
    */
-  public async sendViewContent(userData: any = {}): Promise<{ success: boolean; eventId: string; channels: string[] }> {
+  public async sendViewContent(userData: any = {}): Promise<{ success: boolean; eventId: string; channel: string }> {
     const eventData = {
       user_data: userData,
       custom_data: {
@@ -285,7 +287,7 @@ class EventManager {
     return this.sendEvent('view_content', eventData);
   }
 
-  public async sendInitiateCheckout(userData: any = {}): Promise<{ success: boolean; eventId: string; channels: string[] }> {
+  public async sendInitiateCheckout(userData: any = {}): Promise<{ success: boolean; eventId: string; channel: string }> {
     const eventData = {
       user_data: userData,
       custom_data: {
@@ -313,6 +315,15 @@ class EventManager {
   /**
    * Métodos utilitários
    */
+  public setPrimaryChannel(channel: 'gtm' | 'server' | 'fb'): void {
+    this.config.primaryChannel = channel;
+    console.log(`🔧 Canal primário alterado para: ${channel}`);
+  }
+
+  public getPrimaryChannel(): string {
+    return this.config.primaryChannel;
+  }
+
   public getCacheStats(): any {
     return {
       cacheSize: this.eventCache.size,

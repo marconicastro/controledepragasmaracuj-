@@ -66,7 +66,7 @@ export const META_CONFIG = {
   // Configurações de Hotmart
   HOTMART: {
     // URL base do checkout
-    checkoutUrl: 'https://checkout.maracujazeropragas.com/VCCL1O8SCBWP',
+    checkoutUrl: 'https://go.allpes.com.br/r1wl4qyyfv',
     
     // Parâmetros obrigatórios para pré-preenchimento
     requiredParams: ['name', 'email'],

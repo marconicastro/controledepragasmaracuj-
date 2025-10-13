@@ -10,6 +10,8 @@ interface OptimizedImageProps {
   height?: number;
   priority?: boolean;
   style?: React.CSSProperties;
+  loading?: 'lazy' | 'eager';
+  fetchPriority?: 'high' | 'auto' | 'low';
 }
 
 export default function OptimizedImage({ 
@@ -19,7 +21,9 @@ export default function OptimizedImage({
   width, 
   height, 
   priority = false,
-  style 
+  style,
+  loading,
+  fetchPriority
 }: OptimizedImageProps) {
   return (
     <img
@@ -29,9 +33,10 @@ export default function OptimizedImage({
       style={style}
       width={width}
       height={height}
-      loading={priority ? 'eager' : 'lazy'}
+      loading={loading || (priority ? 'eager' : 'lazy')}
       decoding="async"
       draggable="false"
+      fetchPriority={fetchPriority || (priority ? 'high' : 'auto')}
       onContextMenu={(e) => e.preventDefault()}
       onDragStart={(e) => e.preventDefault()}
     />

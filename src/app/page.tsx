@@ -85,7 +85,7 @@ export default function App() {
     // Construir URL final rapidamente
     const finalUrlString = buildURLWithUTM(META_CONFIG.HOTMART.checkoutUrl, additionalParams);
     
-    // === CRÍTICO: Disparar initiate checkout ANTES do redirecionamento ===
+    // === CRÍTICO: Disparar initiate checkout de forma assíncrona sem bloquear ===
     try {
       // Capturar dados essenciais para rastreamento
       const { fbc, fbp } = getFacebookCookies();
@@ -107,15 +107,17 @@ export default function App() {
         utm_campaign: utmParams.utm_campaign
       };
 
-      console.log('🔥 Disparando initiate checkout ANTES do redirecionamento...');
+      console.log('🔥 Disparando initiate checkout de forma assíncrona...');
 
-      // Disparar evento initiate checkout de forma síncrona
+      // Disparar evento de forma assíncrona NÃO BLOQUEANTE
       if (typeof window !== 'undefined' && window.advancedTracking) {
-        await window.advancedTracking.trackCheckout(userData);
-        console.log('✅ Initiate checkout disparado com sucesso');
+        // Usar Promise sem await para não bloquear o redirecionamento
+        window.advancedTracking.trackCheckout(userData)
+          .then(() => console.log('✅ Initiate checkout disparado com sucesso'))
+          .catch(error => console.log('Erro no rastreamento (não bloqueante):', error));
       }
 
-      // Salvar dados para uso futuro
+      // Salvar dados para uso futuro de forma síncrona
       if (typeof window !== 'undefined') {
         const personalDataToSave = {
           fn: userData.firstName,
@@ -133,10 +135,8 @@ export default function App() {
     // Fechar modal e redirecionar IMEDIATAMENTE após o evento
     setIsPreCheckoutModalOpen(false);
     
-    // Pequeno delay apenas para garantir que o evento seja enviado
-    setTimeout(() => {
-      window.location.href = finalUrlString;
-    }, 50); // 50ms apenas para garantir envio do evento
+    // Redirecionar sem delay - o evento já foi enviado de forma síncrona
+    window.location.href = finalUrlString;
   };
 
   const scrollToCheckout = () => {
@@ -186,7 +186,7 @@ export default function App() {
               <span className="text-green-600">COM O TRIPS!</span>
             </h1>
 
-            {/* Logo do E-book */}
+            {/* Logo do E-book - Otimizado */}
             <div className="mb-4 sm:mb-6">
               <OptimizedImage 
                 src="/ebook-logo.webp" 
@@ -194,6 +194,9 @@ export default function App() {
                 className="mx-auto max-w-full h-auto rounded-lg shadow-lg"
                 style={{ maxWidth: '200px' }}
                 priority={true}
+                width={200}
+                height={200}
+                fetchPriority="high"
               />
             </div>
 
@@ -345,6 +348,9 @@ export default function App() {
                     alt="Travamento das ponteiras causado por trips" 
                     className="mt-2 sm:mt-3 mx-auto max-w-full h-auto rounded-lg shadow-md"
                     style={{ maxWidth: '200px' }}
+                    width={200}
+                    height={267}
+                    loading="lazy"
                   />
                 </div>
                 <div>
@@ -354,6 +360,9 @@ export default function App() {
                     alt="Frutos deformados e manchados por trips" 
                     className="mt-2 sm:mt-3 mx-auto max-w-full h-auto rounded-lg shadow-md"
                     style={{ maxWidth: '200px' }}
+                    width={200}
+                    height={267}
+                    loading="lazy"
                   />
                 </div>
                 <div>
@@ -363,6 +372,9 @@ export default function App() {
                     alt="Viroses que matam as plantas causadas por trips" 
                     className="mt-2 sm:mt-3 mx-auto max-w-full h-auto rounded-lg shadow-md"
                     style={{ maxWidth: '200px' }}
+                    width={200}
+                    height={267}
+                    loading="lazy"
                   />
                 </div>
               </div>
@@ -508,11 +520,11 @@ export default function App() {
                   </div>
                 </div>
                 <p className="text-gray-700 italic mb-3 sm:mb-4 text-xs sm:text-sm">
-                  "Economizei R$ 73.500 em defensivos! O trips sumiu em 21 dias e não voltou mais. 
+                  "Economizei R$ 3.500 em defensivos! O trips sumiu em 21 dias e não voltou mais. 
                   Minha produção aumentou 89% na safra seguinte."
                 </p>
                 <div className="bg-green-100 p-2 sm:p-3 rounded text-green-800 font-semibold text-xs sm:text-sm">
-                  💰 Economia: R$ 73.500 | 📈 Aumento: 89%
+                  💰 Economia: R$ 3.500 | 📈 Aumento: 89%
                 </div>
               </div>
 
@@ -689,10 +701,10 @@ export default function App() {
                   rel="noopener noreferrer"
                   id="botao-compra-hotmart" 
                   onClick={handleHotmartCheckout}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-4 sm:py-6 px-4 sm:px-6 rounded-lg text-base sm:text-xl transform hover:scale-105 transition-all duration-200 shadow-2xl inline-flex items-center justify-center gap-2 sm:gap-3"
+                  className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-6 sm:py-8 px-4 sm:px-6 rounded-lg text-xl sm:text-2xl md:text-3xl transform hover:scale-105 transition-all duration-300 shadow-2xl inline-flex items-center justify-center gap-3 sm:gap-4"
                 >
-                  <DollarSign className="w-4 h-4 sm:w-6 sm:h-6" />
-                  GARANTIR ACESSO POR R$ 39,90
+                  <DollarSign className="w-6 h-6 sm:w-8 sm:h-8" />
+                  COMPRAR AGORA
                 </a>
 
                 <div className="text-center text-xs sm:text-sm text-gray-600 mt-3 sm:mt-4 space-y-1">
