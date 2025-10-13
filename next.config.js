@@ -21,7 +21,6 @@ const nextConfig = {
   // Otimizações de empacotamento
   experimental: {
     optimizePackageImports: ['lucide-react'],
-    optimizeCss: true,
   },
   
   // Configurações de compressão
@@ -31,7 +30,7 @@ const nextConfig = {
   async headers() {
     return [
       {
-        source: '/_next/static/(.*)',
+        source: '/_next/static/:path*',
         headers: [
           {
             key: 'Cache-Control',
@@ -40,7 +39,7 @@ const nextConfig = {
         ],
       },
       {
-        source: '/(.*\\.(webp|jpg|jpeg|png|gif|svg|ico))',
+        source: '/:path*.(webp|jpg|jpeg|png|gif|svg|ico)',
         headers: [
           {
             key: 'Cache-Control',
@@ -49,7 +48,7 @@ const nextConfig = {
         ],
       },
       {
-        source: '/fonts/(.*)',
+        source: '/fonts/:path*',
         headers: [
           {
             key: 'Cache-Control',
