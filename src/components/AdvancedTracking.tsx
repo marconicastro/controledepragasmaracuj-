@@ -159,15 +159,10 @@ export default function AdvancedTracking() {
           const hasPageView = window.dataLayer?.some(item => item.event === 'page_view');
           console.log('- PageView encontrado no dataLayer:', hasPageView);
           
-          // Fallback: Se GTM não funcionou, enviar diretamente via Facebook Pixel
-          if (!hasPageView && typeof window !== 'undefined' && window.fbq) {
-            console.log('🚨 GTM não funcionou, usando fallback direto via Facebook Pixel...');
-            window.fbq('track', 'PageView', {}, {
-              eventID: `pageview_${Date.now()}_fb_fallback`
-            });
-            console.log('✅ PageView enviado via Facebook Pixel (fallback)');
-          } else if (!hasPageView) {
-            console.log('❌ Facebook Pixel também não disponível para fallback');
+          // Fallback desativado para evitar duplicidade com GTM/Stape
+          if (!hasPageView) {
+            console.log('⚠️ PageView não encontrado no dataLayer, mas fallback desativado para evitar duplicidade');
+            console.log('💡 Verifique sua configuração GTM/Stape');
           }
         }, 2000);
       } else {
@@ -242,16 +237,8 @@ export default function AdvancedTracking() {
               console.log('✅ PageView de teste enviado via GA4 direto');
             }
             
-            // Testar fallback também
-            setTimeout(() => {
-              if (window.fbq) {
-                console.log('🧪 Testando PageView via Facebook Pixel direto...');
-                window.fbq('track', 'PageView', {}, {
-                  eventID: `pageview_test_${Date.now()}_fb_direct`
-                });
-                console.log('✅ PageView de teste enviado via Facebook Pixel direto');
-              }
-            }, 1000);
+            // Facebook Pixel fallback desativado para evitar duplicidade
+            console.log('🚫 Facebook Pixel fallback desativado para teste (evitar duplicidade)');
           } else {
             console.log('❌ dataLayer não disponível para teste');
           }

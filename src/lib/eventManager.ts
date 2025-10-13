@@ -33,7 +33,7 @@ class EventManager {
   private constructor() {
     this.config = {
       enableClientSide: true,
-      enableServerSide: false, // Desativado para evitar duplicação
+      enableServerSide: false, // Desativado - GTM/Stape já faz server-side
       enableGTM: true, // Ativado - GTM é o canal primário
       primaryChannel: 'gtm', // GTM como canal primário
       deduplicationWindow: 5 * 60 * 1000 // 5 minutos
@@ -43,6 +43,7 @@ class EventManager {
     setInterval(() => this.cleanupCache(), 60000);
     
     console.log('🎯 EventManager configurado para canal único:', this.config.primaryChannel);
+    console.log('🚫 Facebook Pixel fallback desativado para evitar duplicidade com GTM/Stape');
   }
 
   public static getInstance(): EventManager {
@@ -191,25 +192,9 @@ class EventManager {
   }
 
   private async sendFacebookPixelDirect(eventId: string, eventName: string, data: any): Promise<boolean> {
-    if (typeof window === 'undefined' || !window.fbq) {
-      console.log(`📤 Facebook Pixel não disponível, pulando envio direto de ${eventName}`);
-      return false;
-    }
-
-    try {
-      console.log(`📤 Enviando evento via Facebook Pixel direto: ${eventName}`);
-      
-      const fbEventName = this.mapToFacebookEventName(eventName);
-      const fbData = this.prepareFacebookPixelData(data);
-      
-      window.fbq('track', fbEventName, fbData, { eventID: eventId });
-      
-      console.log(`✅ Evento Facebook Pixel direto enviado: ${eventName} -> ${fbEventName}`);
-      return true;
-    } catch (error) {
-      console.error(`❌ Erro ao enviar evento Facebook Pixel direto ${eventName}:`, error);
-      return false;
-    }
+    // Facebook Pixel direto desativado para evitar duplicidade com GTM/Stape
+    console.log(`🚫 Facebook Pixel direto desativado para ${eventName} (evitar duplicidade com GTM/Stape)`);
+    return false;
   }
 
   private mapToFacebookEventName(internalEventName: string): string {

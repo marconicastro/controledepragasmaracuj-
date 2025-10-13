@@ -33,8 +33,8 @@ export default function TestTrackingPage() {
     );
 
     addResult('Carregamento Facebook Pixel', 
-      typeof window !== 'undefined' && window.fbq ? 'success' : 'error',
-      typeof window !== 'undefined' && window.fbq ? 'Facebook Pixel carregado' : 'Facebook Pixel não encontrado',
+      typeof window !== 'undefined' && window.fbq ? 'warning' : 'success',
+      typeof window !== 'undefined' && window.fbq ? 'Facebook Pixel carregado (mas desativado)' : 'Facebook Pixel não carregado (correto)',
       { fbq: !!window.fbq }
     );
 
@@ -42,7 +42,7 @@ export default function TestTrackingPage() {
     try {
       const { eventManager } = await import('@/lib/eventManager');
       const channel = eventManager.getPrimaryChannel();
-      addResult('EventManager', 'success', `Canal primário: ${channel}`, { channel });
+      addResult('EventManager', 'success', `Canal primário: ${channel} (apenas GTM)`, { channel });
     } catch (error) {
       addResult('EventManager', 'error', 'Erro ao carregar EventManager', { error });
     }
@@ -272,6 +272,9 @@ export default function TestTrackingPage() {
                   <p>window.advancedTracking.testViewContent()</p>
                   <p>window.advancedTracking.testCheckout()</p>
                 </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  ⚠️ Facebook Pixel direto desativado para evitar duplicidade com GTM/Stape
+                </p>
               </div>
               
               <Separator />
@@ -286,9 +289,18 @@ export default function TestTrackingPage() {
               <Separator />
               
               <div>
-                <h4 className="font-medium mb-2">3. Facebook Pixel Helper</h4>
+                <h4 className="font-medium mb-2">3. Facebook Events Manager</h4>
                 <p className="text-sm text-muted-foreground">
-                  Use a extensão Facebook Pixel Helper para validar os eventos do Facebook.
+                  Verifique os eventos no Facebook Events Manager. Apenas eventos via GTM/Stape devem aparecer.
+                </p>
+              </div>
+
+              <Separator />
+
+              <div>
+                <h4 className="font-medium mb-2">4. GA4 Realtime</h4>
+                <p className="text-sm text-muted-foreground">
+                  Monitore eventos em tempo real no Google Analytics 4 → Relatórios → Tempo real.
                 </p>
               </div>
             </div>
