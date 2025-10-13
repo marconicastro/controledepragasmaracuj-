@@ -35,6 +35,10 @@ export function getFacebookCookies(): {
 export function captureFbclid(): void {
   if (typeof window === 'undefined') return;
   
+  console.log('🔍 Verificando fbclid na URL...');
+  console.log('- URL completa:', window.location.href);
+  console.log('- Parâmetros da URL:', window.location.search);
+  
   // Verificar se já temos o cookie _fbc
   const existingFbc = getCookie('_fbc');
   if (existingFbc) {
@@ -45,6 +49,8 @@ export function captureFbclid(): void {
   // Capturar fbclid da URL
   const urlParams = new URLSearchParams(window.location.search);
   const fbclid = urlParams.get('fbclid');
+  
+  console.log('📊 fbclid capturado da URL:', fbclid);
   
   if (fbclid) {
     // Criar o cookie _fbc no formato correto
@@ -60,8 +66,20 @@ export function captureFbclid(): void {
     
     console.log('🎯 Cookie _fbc criado com sucesso:', fbcValue);
     console.log('📊 fbclid capturado:', fbclid);
+    console.log('🔍 Verificando se o cookie foi salvo...');
+    
+    // Verificar se o cookie foi salvo corretamente
+    setTimeout(() => {
+      const savedFbc = getCookie('_fbc');
+      console.log('✅ Cookie _fbc salvo e recuperado:', savedFbc);
+    }, 100);
+    
   } else {
     console.log('ℹ️ Nenhum fbclid encontrado na URL - usuário pode ter acessado diretamente');
+    console.log('🔍 Parâmetros disponíveis na URL:');
+    for (const [key, value] of urlParams.entries()) {
+      console.log(`   - ${key}: ${value}`);
+    }
   }
 }
 

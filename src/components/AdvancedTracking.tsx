@@ -13,7 +13,7 @@ const trackViewContent = async (viewContentHasBeenTracked: any) => {
 
   console.log('🚀 Enviando ViewContent único...');
 
-  await initializeTracking();
+  // initializeTracking() já foi chamado no useEffect principal
   await new Promise(resolve => setTimeout(resolve, 100));
 
   const locationData = await getHighQualityLocationData();
@@ -103,6 +103,10 @@ export default function AdvancedTracking() {
   const pageViewHasBeenTracked = useRef(false);
 
   useEffect(() => {
+    // � CRÍTICO: Inicializar tracking IMEDIATAMENTE para capturar fbclid
+    console.log('🚀 Inicializando tracking imediatamente...');
+    initializeTracking();
+    
     // Otimizado: iniciar tracking sem bloquear renderização
     const initTimer = requestIdleCallback(() => {
       // Adicionar logs detalhados para debug do PageView
@@ -251,10 +255,38 @@ export default function AdvancedTracking() {
           console.log('- gtag:', !!window.gtag);
           console.log('- pageView já trackeado:', pageViewHasBeenTracked.current);
           console.log('- viewContent já trackeado:', viewContentHasBeenTracked.current);
+          
+          // Verificar cookies Facebook
+          const { fbc, fbp } = require('@/lib/cookies').getFacebookCookies();
+          console.log('📊 Status dos cookies Facebook:');
+          console.log('- _fbc:', fbc || '❌ Não encontrado');
+          console.log('- _fbp:', fbp || '❌ Não encontrado');
+          
+          // Verificar parâmetros da URL atual
+          if (typeof window !== 'undefined') {
+            const urlParams = new URLSearchParams(window.location.search);
+            const fbclid = urlParams.get('fbclid');
+            console.log('🔍 Parâmetros da URL atual:');
+            console.log('- fbclid:', fbclid || '❌ Não encontrado');
+            console.log('- URL completa:', window.location.href);
+          }
+          
           if (window.dataLayer) {
             console.log('- dataLayer items:', window.dataLayer.length);
             console.log('- dataLayer content:', window.dataLayer);
           }
+        },
+        // Função para testar captura de fbclid
+        testFbclidCapture: () => {
+          console.log('🧪 Testando captura de fbclid...');
+          const { captureFbclid, getFacebookCookies } = require('@/lib/cookies');
+          captureFbclid();
+          setTimeout(() => {
+            const { fbc, fbp } = getFacebookCookies();
+            console.log('📊 Resultado após teste:');
+            console.log('- _fbc:', fbc || '❌ Não capturado');
+            console.log('- _fbp:', fbp || '❌ Não capturado');
+          }, 200);
         }
       };
     }
@@ -281,6 +313,7 @@ declare global {
       testViewContent: () => void;
       testPageView: () => void;
       checkTrackingStatus: () => void;
+      testFbclidCapture: () => void;
     };
   }
 }
