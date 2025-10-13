@@ -34,8 +34,8 @@ class EventManager {
     this.config = {
       enableClientSide: true,
       enableServerSide: false, // Desativado para evitar duplicação
-      enableGTM: false, // Desativado para evitar duplicação
-      primaryChannel: 'fb', // Apenas Facebook Pixel direto
+      enableGTM: true, // Ativado - GTM é o canal primário
+      primaryChannel: 'gtm', // GTM como canal primário
       deduplicationWindow: 5 * 60 * 1000 // 5 minutos
     };
 
@@ -110,16 +110,40 @@ class EventManager {
       
       window.dataLayer = window.dataLayer || [];
       
+      // Mapear eventos para nomes padrão
+      const mappedEventName = this.mapToStandardEventName(eventName);
+      
       const eventData = {
-        event: eventName,
+        event: mappedEventName,
         event_id: eventId,
         user_data: data.user_data,
-        custom_data: data.custom_data
+        custom_data: data.custom_data,
+        // Dados adicionais para GA4
+        event_category: data.custom_data?.content_category || 'engagement',
+        event_label: data.custom_data?.content_name || 'E-book',
+        value: data.custom_data?.value || 0,
+        currency: data.custom_data?.currency || 'BRL',
+        // Timestamp para debug
+        timestamp: new Date().toISOString()
       };
 
       window.dataLayer.push(eventData);
       
-      console.log(`✅ Evento GTM enviado: ${eventName}`);
+      // Enviar também evento específico para GA4 se disponível
+      if (typeof window.gtag !== 'undefined') {
+        const ga4EventName = this.mapToGA4EventName(eventName);
+        window.gtag('event', ga4EventName, {
+          event_category: data.custom_data?.content_category || 'engagement',
+          event_label: data.custom_data?.content_name || 'E-book',
+          value: data.custom_data?.value || 0,
+          currency: data.custom_data?.currency || 'BRL',
+          custom_parameter_1: eventId,
+          send_to: 'G-CZ0XMXL3RX'
+        });
+        console.log(`✅ Evento GA4 também enviado: ${ga4EventName}`);
+      }
+      
+      console.log(`✅ Evento GTM enviado: ${eventName} -> ${mappedEventName}`);
       return true;
     } catch (error) {
       console.error(`❌ Erro ao enviar evento GTM ${eventName}:`, error);
@@ -192,6 +216,26 @@ class EventManager {
     const eventMapping: { [key: string]: string } = {
       'view_content': 'ViewContent',
       'initiate_checkout': 'InitiateCheckout'
+    };
+
+    return eventMapping[internalEventName] || internalEventName;
+  }
+
+  private mapToStandardEventName(internalEventName: string): string {
+    const eventMapping: { [key: string]: string } = {
+      'view_content': 'view_content',
+      'initiate_checkout': 'initiate_checkout',
+      'PageView': 'page_view'
+    };
+
+    return eventMapping[internalEventName] || internalEventName;
+  }
+
+  private mapToGA4EventName(internalEventName: string): string {
+    const eventMapping: { [key: string]: string } = {
+      'view_content': 'view_item',
+      'initiate_checkout': 'begin_checkout',
+      'PageView': 'page_view'
     };
 
     return eventMapping[internalEventName] || internalEventName;

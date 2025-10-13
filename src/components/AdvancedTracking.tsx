@@ -118,16 +118,37 @@ export default function AdvancedTracking() {
         
         // Adicionar log detalhado antes de enviar
         const pageViewEvent = {
-          event: 'PageView',
+          event: 'page_view',
           event_id: `pageview_${Date.now()}_gtm`,
           page_title: document.title,
           page_location: window.location.href,
-          page_referrer: document.referrer
+          page_referrer: document.referrer,
+          // Dados adicionais para GA4
+          event_category: 'navigation',
+          event_label: document.title,
+          timestamp: new Date().toISOString()
         };
         
         console.log('📤 Evento PageView que será enviado:', pageViewEvent);
         
         window.dataLayer.push(pageViewEvent);
+        
+        // Enviar também diretamente para GA4 se disponível
+        if (typeof window.gtag !== 'undefined') {
+          window.gtag('config', 'G-CZ0XMXL3RX', {
+            page_title: document.title,
+            page_location: window.location.href,
+            page_referrer: document.referrer
+          });
+          window.gtag('event', 'page_view', {
+            page_title: document.title,
+            page_location: window.location.href,
+            page_referrer: document.referrer,
+            send_to: 'G-CZ0XMXL3RX'
+          });
+          console.log('✅ PageView também enviado diretamente para GA4');
+        }
+        
         pageViewHasBeenTracked.current = true;
         console.log('✅ PageView enviado via GTM');
         console.log('📊 dataLayer após PageView:', window.dataLayer);
@@ -135,7 +156,7 @@ export default function AdvancedTracking() {
         // Verificar se o evento foi realmente adicionado
         setTimeout(() => {
           console.log('🔍 Verificando se PageView está no dataLayer...');
-          const hasPageView = window.dataLayer?.some(item => item.event === 'PageView');
+          const hasPageView = window.dataLayer?.some(item => item.event === 'page_view');
           console.log('- PageView encontrado no dataLayer:', hasPageView);
           
           // Fallback: Se GTM não funcionou, enviar diretamente via Facebook Pixel
@@ -193,17 +214,33 @@ export default function AdvancedTracking() {
           console.log('🧪 Testando PageView...');
           if (typeof window !== 'undefined' && window.dataLayer) {
             const testEvent = {
-              event: 'PageView',
+              event: 'page_view',
               event_id: `pageview_test_${Date.now()}_gtm`,
               page_title: document.title,
               page_location: window.location.href,
               page_referrer: document.referrer,
-              test_mode: true
+              event_category: 'navigation',
+              event_label: document.title,
+              test_mode: true,
+              timestamp: new Date().toISOString()
             };
             
             console.log('📤 Enviando PageView de teste:', testEvent);
             window.dataLayer.push(testEvent);
             console.log('✅ PageView de teste enviado via GTM');
+            
+            // Testar GA4 também
+            if (typeof window.gtag !== 'undefined') {
+              console.log('🧪 Testando PageView via GA4 direto...');
+              window.gtag('event', 'page_view', {
+                page_title: document.title,
+                page_location: window.location.href,
+                page_referrer: document.referrer,
+                send_to: 'G-CZ0XMXL3RX',
+                test_mode: true
+              });
+              console.log('✅ PageView de teste enviado via GA4 direto');
+            }
             
             // Testar fallback também
             setTimeout(() => {
