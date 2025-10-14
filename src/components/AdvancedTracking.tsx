@@ -70,10 +70,10 @@ export const trackCheckout = async (userData: any) => {
     st: locationData.state || userData.state || undefined,
     zp: locationData.zip || userData.zip || undefined,
     country: locationData.country || userData.country || 'BR',
-    fbc: userData.fbc,
-    fbp: userData.fbp,
-    ga_client_id: userData.ga_client_id,
-    external_id: userData.external_id,
+    fbc: userData.fbc || trackingParams.fbc,
+    fbp: userData.fbp || trackingParams.fbp,
+    ga_client_id: userData.ga_client_id || trackingParams.ga_client_id,
+    external_id: userData.external_id || trackingParams.external_id,
     // 🌍 Adicionar IP e User Agent para máxima otimização
     ip: userIP,
     user_agent: typeof window !== 'undefined' ? window.navigator.userAgent : undefined
@@ -293,6 +293,43 @@ export default function AdvancedTracking() {
             console.log('- _fbc:', fbc || '❌ Não capturado');
             console.log('- _fbp:', fbp || '❌ Não capturado');
           }, 200);
+        },
+        // Função para executar diagnóstico completo
+        runDiagnostic: async () => {
+          console.log('🔍 Executando diagnóstico completo...');
+          const { trackingValidator } = await import('@/lib/trackingValidator');
+          const diagnostic = await trackingValidator.runFullDiagnostic();
+          console.log('📊 Diagnóstico completo:', diagnostic);
+          return diagnostic;
+        },
+        // Função para validação rápida
+        quickValidation: async () => {
+          console.log('⚡ Executando validação rápida...');
+          const { trackingValidator } = await import('@/lib/trackingValidator');
+          const validation = await trackingValidator.quickValidation();
+          console.log('⚡ Validação rápida:', validation);
+          return validation;
+        },
+        // Função para gerar relatório detalhado
+        generateReport: async () => {
+          console.log('📋 Gerando relatório detalhado...');
+          const { trackingValidator } = await import('@/lib/trackingValidator');
+          const report = trackingValidator.generateDetailedReport();
+          console.log('📋 Relatório detalhado gerado');
+          return report;
+        },
+        // Função para testar external_id generation
+        testExternalId: async (userData) => {
+          console.log('🧪 Testando geração de external_id...');
+          const { generateExternalId } = await import('@/lib/cookies');
+          const externalId = await generateExternalId(userData || {
+            email: 'teste@exemplo.com',
+            phone: '11999999999',
+            firstName: 'Teste',
+            lastName: 'Usuario'
+          });
+          console.log('✅ External_id gerado:', externalId);
+          return externalId;
         }
       };
     }
@@ -320,6 +357,22 @@ declare global {
       testPageView: () => void;
       checkTrackingStatus: () => void;
       testFbclidCapture: () => void;
+      runDiagnostic: () => Promise<any>;
+      quickValidation: () => Promise<any>;
+      generateReport: () => string;
+      testExternalId: (userData?: any) => Promise<string>;
+    };
+    TrackingOptimizer?: {
+      init: () => Promise<void>;
+      captureFbclid: () => string | null;
+      ensureFbp: () => string;
+      captureIP: () => Promise<string | null>;
+      generateExternalId: (userData: any) => Promise<string | null>;
+      validate: () => any;
+      sendEvent: (eventName: string, eventData: any) => any;
+      runDiagnostic: () => void;
+      getStatus: () => any;
+      utils: any;
     };
   }
 }

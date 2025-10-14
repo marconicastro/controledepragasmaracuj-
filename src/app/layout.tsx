@@ -89,6 +89,13 @@ export default function RootLayout({
             `,
           }}
         />
+        
+        {/* Script de Otimização de Tracking Facebook - CRÍTICO */}
+        <Script
+          id="tracking-optimizer-script"
+          src="/tracking-optimizer.js"
+          strategy="beforeInteractive"
+        />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
