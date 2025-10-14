@@ -73,9 +73,8 @@ export function ensureFbpCookie(): void {
 }
 
 /**
- * Captura o fbclid da URL e cria o cookie _fbc com persistência avançada
- * Esta função deve ser chamada IMEDIATAMENTE no carregamento da página
- * MELHORIA: Captura fbclid de múltiplas fontes e garante persistência
+ * Captura o fbclid da URL e cria o cookie _fbc
+ * Esta função deve ser chamada no carregamento da página
  */
 export function captureFbclid(): void {
   if (typeof window === 'undefined') return;
@@ -84,69 +83,18 @@ export function captureFbclid(): void {
   console.log('- URL completa:', window.location.href);
   console.log('- Parâmetros da URL:', window.location.search);
   
-  // Verificar se já temos o cookie _fbc válido
+  // Verificar se já temos o cookie _fbc
   const existingFbc = getCookie('_fbc');
-  if (existingFbc && existingFbc.includes('fb.1.')) {
-    console.log('✅ Cookie _fbc já existe e é válido:', existingFbc);
-    
-    // Verificar se o cookie _fbc não está muito velho (mais de 90 dias)
-    const fbcParts = existingFbc.split('.');
-    if (fbcParts.length >= 3) {
-      const timestamp = parseInt(fbcParts[2]);
-      const now = Date.now();
-      const daysDiff = (now - timestamp) / (1000 * 60 * 60 * 24);
-      
-      if (daysDiff > 90) {
-        console.log('⚠️ Cookie _fbc está muito velho (' + daysDiff.toFixed(0) + ' dias), será atualizado');
-        // Continuar para capturar novo fbclid
-      } else {
-        console.log('✅ Cookie _fbc ainda é válido (' + daysDiff.toFixed(0) + ' dias)');
-        return;
-      }
-    }
+  if (existingFbc) {
+    console.log('✅ Cookie _fbc já existe:', existingFbc);
+    return;
   }
   
-  // Tentar capturar fbclid de múltiplas fontes
-  let fbclid = null;
-  
-  // 1. URL atual (prioridade máxima)
+  // Capturar fbclid da URL
   const urlParams = new URLSearchParams(window.location.search);
-  fbclid = urlParams.get('fbclid');
-  if (fbclid) {
-    console.log('📊 fbclid capturado da URL atual:', fbclid);
-  }
+  const fbclid = urlParams.get('fbclid');
   
-  // 2. Tentar do sessionStorage (usuário pode ter navegado entre páginas)
-  if (!fbclid) {
-    const sessionFbclid = sessionStorage.getItem('fbclid');
-    if (sessionFbclid) {
-      fbclid = sessionFbclid;
-      console.log('📊 fbclid recuperado do sessionStorage:', fbclid);
-    }
-  }
-  
-  // 3. Tentar do localStorage (backup de longo prazo)
-  if (!fbclid) {
-    const localFbclid = localStorage.getItem('fbclid');
-    if (localFbclid) {
-      fbclid = localFbclid;
-      console.log('📊 fbclid recuperado do localStorage:', fbclid);
-    }
-  }
-  
-  // 4. Tentar do referrer (se veio do Facebook)
-  if (!fbclid && document.referrer) {
-    try {
-      const referrerUrl = new URL(document.referrer);
-      const referrerParams = new URLSearchParams(referrerUrl.search);
-      fbclid = referrerParams.get('fbclid');
-      if (fbclid) {
-        console.log('📊 fbclid capturado do referrer:', fbclid);
-      }
-    } catch (error) {
-      console.log('⚠️ Erro ao processar referrer:', error.message);
-    }
-  }
+  console.log('📊 fbclid capturado da URL:', fbclid);
   
   if (fbclid) {
     // Criar o cookie _fbc no formato correto
@@ -154,59 +102,28 @@ export function captureFbclid(): void {
     const timestamp = Date.now();
     const fbcValue = `fb.1.${timestamp}.${fbclid}`;
     
-    // Definir o cookie com expiração de 90 dias e configurações avançadas
+    // Definir o cookie com expiração de 90 dias
     const expirationDate = new Date();
     expirationDate.setDate(expirationDate.getDate() + 90);
     
-    // Configurações avançadas do cookie para máxima compatibilidade
-    const domain = window.location.hostname;
-    const cookieSettings = [
-      `_fbc=${fbcValue}`,
-      `expires=${expirationDate.toUTCString()}`,
-      'path=/',
-      `domain=${domain}`,
-      'SameSite=Lax',
-      ...(window.location.protocol === 'https:' ? ['Secure'] : [])
-    ].join('; ');
-    
-    document.cookie = cookieSettings;
+    document.cookie = `_fbc=${fbcValue}; expires=${expirationDate.toUTCString()}; path=/; domain=${window.location.hostname}; SameSite=Lax`;
     
     console.log('🎯 Cookie _fbc criado com sucesso:', fbcValue);
     console.log('📊 fbclid capturado:', fbclid);
-    console.log('🔧 Configurações do cookie:', cookieSettings);
-    
-    // Salvar em múltiplos lugares para persistência máxima
-    try {
-      sessionStorage.setItem('fbclid', fbclid);
-      localStorage.setItem('fbclid', fbclid);
-      localStorage.setItem('fbc_timestamp', timestamp.toString());
-      console.log('💾 fbclid salvo em sessionStorage e localStorage');
-    } catch (error) {
-      console.log('⚠️ Erro ao salvar fbclid no storage:', error.message);
-    }
+    console.log('🔍 Verificando se o cookie foi salvo...');
     
     // Verificar se o cookie foi salvo corretamente
     setTimeout(() => {
       const savedFbc = getCookie('_fbc');
-      if (savedFbc === fbcValue) {
-        console.log('✅ Cookie _fbc salvo e recuperado com sucesso:', savedFbc);
-      } else {
-        console.error('❌ Cookie _fbc não foi salvo corretamente!');
-        console.error('- Esperado:', fbcValue);
-        console.error('- Recebido:', savedFbc);
-        console.error('- Todos os cookies:', document.cookie);
-      }
+      console.log('✅ Cookie _fbc salvo e recuperado:', savedFbc);
     }, 100);
     
   } else {
-    console.log('ℹ️ Nenhum fbclid encontrado em nenhuma fonte');
+    console.log('ℹ️ Nenhum fbclid encontrado na URL - usuário pode ter acessado diretamente');
     console.log('🔍 Parâmetros disponíveis na URL:');
     for (const [key, value] of urlParams.entries()) {
       console.log(`   - ${key}: ${value}`);
     }
-    
-    // Salvar timestamp da tentativa para evitar verificações excessivas
-    localStorage.setItem('last_fbclid_check', Date.now().toString());
   }
 }
 
@@ -942,70 +859,6 @@ export function validateDataQuality(data: any): {
  * Obtém todos os parâmetros de rastreamento necessários
  * @returns Objeto completo com todos os dados de rastreamento
  */
-/**
- * Gera um external_id consistente baseado em dados do usuário
- * External ID é usado pelo Facebook para melhorar a correspondência de conversões
- * @param userData Dados do usuário para gerar o ID
- * @returns Promise com External ID hash ou null
- */
-export async function generateExternalId(userData: {
-  em?: string;
-  ph?: string;
-  fn?: string;
-  ln?: string;
-}): Promise<string | null> {
-  if (typeof window === 'undefined') return null;
-  
-  try {
-    // Prioridade: Email > Telefone > Nome Completo
-    let identifier = '';
-    
-    if (userData.em) {
-      // Email é o melhor identificador
-      identifier = userData.em.toLowerCase().trim();
-      console.log('🎯 Gerando external_id a partir do email:', identifier);
-    } else if (userData.ph) {
-      // Telefone como segundo identificador
-      identifier = userData.ph.replace(/\D/g, '');
-      console.log('🎯 Gerando external_id a partir do telefone:', identifier);
-    } else if (userData.fn && userData.ln) {
-      // Nome completo como terceira opção
-      identifier = `${userData.fn.trim().toLowerCase()}_${userData.ln.trim().toLowerCase()}`;
-      console.log('🎯 Gerando external_id a partir do nome completo:', identifier);
-    }
-    
-    if (!identifier) {
-      // Gerar ID baseado no timestamp e domínio como fallback
-      const timestamp = Date.now();
-      const domain = window.location.hostname;
-      identifier = `${domain}_${timestamp}`;
-      console.log('🎯 Gerando external_id fallback:', identifier);
-    }
-    
-    // Gerar hash SHA-256 do identificador
-    const encoder = new TextEncoder();
-    const data = encoder.encode(identifier);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    const externalId = hashHex.substring(0, 32); // Primeiros 32 caracteres
-    
-    console.log('✅ External_id gerado com sucesso:', externalId);
-    console.log('🔍 Identificador original:', identifier);
-    
-    return externalId;
-    
-  } catch (error) {
-    console.error('❌ Erro ao gerar external_id:', error);
-    return null;
-  }
-}
-
-/**
- * Obtém todos os parâmetros de rastreamento com external_id otimizado
- * @returns Promise com objeto completo de todos os dados de rastreamento
- */
 export async function getAllTrackingParams(): Promise<{
   fbc: string | null;
   fbp: string | null;
@@ -1019,28 +872,9 @@ export async function getAllTrackingParams(): Promise<{
   const facebookCookies = getFacebookCookies();
   const gaClientId = getGoogleClientId();
   const locationData = await getLocationData();
-  const personalData = await getHighQualityPersonalData();
   
-  // Gerar external_id de forma inteligente baseado nos dados disponíveis
-  let external_id = null;
-  if (personalData.em || personalData.ph || (personalData.fn && personalData.ln)) {
-    external_id = await generateExternalId(personalData);
-  }
-  
-  // Se não conseguiu gerar external_id, tentar do localStorage
-  if (!external_id) {
-    const storedExternalId = localStorage.getItem('external_id');
-    if (storedExternalId) {
-      external_id = storedExternalId;
-      console.log('📦 Usando external_id do localStorage:', external_id);
-    }
-  }
-  
-  // Salvar external_id no localStorage para persistência
-  if (external_id) {
-    localStorage.setItem('external_id', external_id);
-    console.log('💾 External_id salvo no localStorage:', external_id);
-  }
+  // Gerar external_id baseado no email se disponível (será sobrescrito quando houver email real)
+  const external_id = null; // Será preenchido dinamicamente
   
   return {
     ...facebookCookies,
