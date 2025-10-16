@@ -66,7 +66,7 @@ export const META_CONFIG = {
   // Configurações de Hotmart
   HOTMART: {
     // URL base do checkout
-    checkoutUrl: 'https://go.allpes.com.br/r1wl4qyyfv',
+    checkoutUrl: 'https://pay.cakto.com.br/hacr962_605077',
     
     // Parâmetros obrigatórios para pré-preenchimento
     requiredParams: ['name', 'email'],
