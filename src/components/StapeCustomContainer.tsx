@@ -41,20 +41,10 @@ export default function StapeCustomContainer({ gtmId = 'GTM-567XZCDX' }: StapeCu
       window.dataLayer.push(args);
     };
 
-    // Configuração inicial do GTM com otimizações Server-Side
+    // Configuração inicial do GTM (sem eventos automáticos)
     window.gtag('js', new Date());
     window.gtag('config', gtmId, { 
-      send_page_view: false, // Desativar envio automático de page_view
-      server_container_url: 'https://data.maracujazeropragas.com',
-      transport_type: 'beacon',
-      debug_mode: process.env.NODE_ENV === 'development',
-      parameter: {
-        // Parâmetros avançados para GTM Server
-        event_timeout: 2000,
-        user_properties: {
-          tracking_version: 'server_side_v2'
-        }
-      }
+      send_page_view: false // Desativar envio automático de page_view
     });
 
     // Enviar PageView via EventManager (coordenado)

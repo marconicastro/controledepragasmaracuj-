@@ -1,7 +1,3 @@
-import { validateEvent, quickValidate } from './schemaValidator';
-import { executeWithRecovery } from './errorRecovery';
-import { performanceMonitor, calculateEMQScore } from './performanceMonitor';
-
 /**
  * Gerenciador Simplificado de Eventos - Apenas Eventos Essenciais
  * 
@@ -10,7 +6,6 @@ import { performanceMonitor, calculateEMQScore } from './performanceMonitor';
  * 2. Envio via GTM, Server-side e Facebook Pixel
  * 3. Deduplicação adequada
  * 4. Nenhum evento de engajamento excessivo
- * 5. Validação rigorosa de schema
  */
 
 interface EventRecord {
@@ -26,9 +21,8 @@ interface EventConfig {
   enableClientSide: boolean;
   enableServerSide: boolean;
   enableGTM: boolean;
-  enableGTMServer: boolean; // Nova opção
   deduplicationWindow: number;
-  primaryChannel: 'gtm' | 'server' | 'fb' | 'gtm_server'; // Nova opção
+  primaryChannel: 'gtm' | 'server' | 'fb'; // Canal primário único
 }
 
 class EventManager {
@@ -41,8 +35,7 @@ class EventManager {
       enableClientSide: true,
       enableServerSide: false, // Desativado - GTM/Stape já faz server-side
       enableGTM: true, // Ativado - GTM é o canal primário
-      enableGTMServer: true, // Nova opção - GTM Server avançado
-      primaryChannel: 'gtm_server', // GTM Server como canal primário agora
+      primaryChannel: 'gtm', // GTM como canal primário
       deduplicationWindow: 5 * 60 * 1000 // 5 minutos
     };
 
@@ -50,7 +43,6 @@ class EventManager {
     setInterval(() => this.cleanupCache(), 60000);
     
     console.log('🎯 EventManager configurado para canal único:', this.config.primaryChannel);
-    console.log('🚀 GTM Server avançado ativado');
     console.log('🚫 Facebook Pixel fallback desativado para evitar duplicidade com GTM/Stape');
   }
 
@@ -67,7 +59,7 @@ class EventManager {
     return `${eventName}_${timestamp}_${random}_${channel}`;
   }
 
-  private registerEvent(eventId: string, eventName: string, channel: 'client' | 'server' | 'gtm' | 'fb' | 'gtm_server', data: any): void {
+  private registerEvent(eventId: string, eventName: string, channel: 'client' | 'server' | 'gtm' | 'fb', data: any): void {
     // Verificar duplicação por EventID dentro da janela de deduplicação
     const now = Date.now();
     const existingEvent = this.eventCache.get(eventId);
@@ -199,122 +191,6 @@ class EventManager {
     }
   }
 
-  private async sendGTMServer(eventId: string, eventName: string, data: any): Promise<boolean> {
-    if (!this.config.enableGTMServer || typeof window === 'undefined') {
-      return false;
-    }
-
-    try {
-      console.log(`📤 Enviando evento via GTM Server: ${eventName}`);
-      
-      // Transformar dados para formato GTM Server
-      const gtmServerData = this.transformDataForGTMServer(eventId, eventName, data);
-      
-      // Usar sistema de recovery avançado
-      const recoveryResult = await executeWithRecovery(
-        'gtm_server',
-        async () => {
-          const response = await fetch('/api/gtm-server', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(gtmServerData)
-          });
-
-          if (!response.ok) {
-            const error = await response.json();
-            throw new Error(`HTTP ${response.status}: ${error.error || 'Unknown error'}`);
-          }
-
-          return await response.json();
-        },
-        {
-          maxRetries: 2,
-          baseDelay: 500,
-          maxDelay: 3000,
-          enableFallbackChannels: true
-        }
-      );
-
-      if (recoveryResult.success) {
-        console.log(`✅ Evento GTM Server enviado: ${eventName}`, recoveryResult.result);
-        console.log(`📊 Recovery strategy: ${recoveryResult.recoveryStrategy}`);
-        return true;
-      } else {
-        console.error(`❌ Falha total no envio GTM Server ${eventName}:`, recoveryResult.error);
-        console.log(`📊 Recovery strategy: ${recoveryResult.recoveryStrategy}`);
-        return false;
-      }
-    } catch (error) {
-      console.error(`❌ Erro crítico no GTM Server ${eventName}:`, error);
-      return false;
-    }
-  }
-
-  // Transformação de dados específica para GTM Server
-  private transformDataForGTMServer(eventId: string, eventName: string, data: any): any {
-    return {
-      event_name: eventName,
-      event_id: eventId,
-      session_id: this.generateSessionId(),
-      user_data: {
-        // Dados PII
-        em: data.user_data?.em,
-        ph: data.user_data?.ph,
-        fn: data.user_data?.fn,
-        ln: data.user_data?.ln,
-        ct: data.user_data?.ct,
-        st: data.user_data?.st,
-        zp: data.user_data?.zp,
-        country: data.user_data?.country || 'BR',
-        
-        // Identificadores
-        ga_client_id: data.user_data?.ga_client_id,
-        fbc: data.user_data?.fbc,
-        fbp: data.user_data?.fbp,
-        external_id: data.user_data?.external_id,
-        
-        // Dados técnicos
-        client_ip_address: data.user_data?.client_ip_address,
-        client_user_agent: data.user_data?.client_user_agent
-      },
-      custom_data: {
-        // Dados de e-commerce
-        currency: data.custom_data?.currency || 'BRL',
-        value: data.custom_data?.value || 0,
-        content_name: data.custom_data?.content_name,
-        content_category: data.custom_data?.content_category,
-        
-        // Arrays - garantir formato correto
-        content_ids: Array.isArray(data.custom_data?.content_ids) 
-          ? data.custom_data.content_ids 
-          : data.custom_data?.content_ids 
-            ? [data.custom_data.content_ids] 
-            : [],
-        
-        items: Array.isArray(data.custom_data?.items)
-          ? data.custom_data.items
-          : data.custom_data?.items
-            ? [data.custom_data.items]
-            : [],
-        
-        // Dados de página
-        page_title: data.custom_data?.page_title,
-        page_location: data.custom_data?.page_location,
-        page_path: data.custom_data?.page_path
-      },
-      headers: {
-        'user-agent': typeof window !== 'undefined' ? window.navigator.userAgent : undefined
-      }
-    };
-  }
-
-  // Gerar session ID único
-  private generateSessionId(): string {
-    return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }
-
   private async sendFacebookPixelDirect(eventId: string, eventName: string, data: any): Promise<boolean> {
     // Facebook Pixel direto desativado para evitar duplicidade com GTM/Stape
     console.log(`🚫 Facebook Pixel direto desativado para ${eventName} (evitar duplicidade com GTM/Stape)`);
@@ -376,79 +252,15 @@ class EventManager {
   public async sendEvent(
     eventName: string,
     data: any
-  ): Promise<{ success: boolean; eventId: string; channel: string; validation?: any; performance?: any }> {
+  ): Promise<{ success: boolean; eventId: string; channel: string }> {
     console.group(`🎯 EventManager - ${eventName} (canal único: ${this.config.primaryChannel})`);
-    
-    const startTime = Date.now();
-    const monitoringId = performanceMonitor.startEventMonitoring('', eventName, this.config.primaryChannel);
     
     try {
       const eventId = this.generateEventId(eventName, this.config.primaryChannel);
-      
-      // Preparar evento para validação
-      const eventForValidation = {
-        event_name: eventName,
-        event_id: eventId,
-        user_data: data.user_data,
-        custom_data: data.custom_data,
-        timestamp: Date.now()
-      };
-      
-      // 1. Validação rápida
-      const validationStartTime = Date.now();
-      const quickValidation = quickValidate(eventForValidation);
-      const validationTime = Date.now() - validationStartTime;
-      
-      if (!quickValidation.valid) {
-        console.error('❌ Validação rápida falhou:', quickValidation.criticalErrors);
-        
-        // Registrar performance de falha na validação
-        performanceMonitor.recordEventPerformance(eventId, eventName, this.config.primaryChannel, 'failed', {
-          totalProcessingTime: Date.now() - startTime,
-          validationTime,
-          dataQualityScore: 0,
-          emqScore: 0,
-          successRate: 0,
-          errorRate: 100
-        }, 'Validation failed');
-        
-        return { success: false, eventId: '', channel: '', validation: quickValidation };
-      }
-      
-      // 2. Validação completa
-      const validation = validateEvent(eventForValidation);
-      if (!validation.valid) {
-        console.error('❌ Validação completa falhou:', validation.errors);
-        
-        // Registrar performance de falha na validação
-        performanceMonitor.recordEventPerformance(eventId, eventName, this.config.primaryChannel, 'failed', {
-          totalProcessingTime: Date.now() - startTime,
-          validationTime,
-          dataQualityScore: validation.score,
-          emqScore: 0,
-          successRate: 0,
-          errorRate: 100
-        }, 'Schema validation failed');
-        
-        return { success: false, eventId: '', channel: '', validation };
-      }
-      
-      // Log da qualidade dos dados
-      if (validation.score < 80) {
-        console.warn(`⚠️ Qualidade dos dados: ${validation.score}/100`, validation.warnings);
-      } else {
-        console.log(`✅ Qualidade dos dados excelente: ${validation.score}/100`);
-      }
-      
-      // 3. Calcular EMQ Score
-      const emqResult = calculateEMQScore(data.user_data || {});
-      console.log(`🎯 EMQ Score calculado: ${emqResult.score.toFixed(2)}/10`, emqResult.factors);
-      
       this.registerEvent(eventId, eventName, this.config.primaryChannel, data);
       
       let result = false;
       let channel = '';
-      let performanceMetrics: any = {};
 
       // Enviar APENAS pelo canal primário configurado
       switch (this.config.primaryChannel) {
@@ -464,77 +276,21 @@ class EventManager {
           result = await this.sendFacebookPixelDirect(eventId, eventName, data);
           channel = 'fb';
           break;
-        case 'gtm_server':
-          result = await this.sendGTMServer(eventId, eventName, data);
-          channel = 'gtm_server';
-          break;
         default:
           console.error(`❌ Canal primário inválido: ${this.config.primaryChannel}`);
-          
-          // Registrar performance de falha
-          performanceMonitor.recordEventPerformance(eventId, eventName, this.config.primaryChannel, 'failed', {
-            totalProcessingTime: Date.now() - startTime,
-            validationTime,
-            dataQualityScore: validation.score,
-            emqScore: emqResult.score,
-            successRate: 0,
-            errorRate: 100
-          }, 'Invalid channel');
-          
-          return { success: false, eventId: '', channel: '', validation };
+          return { success: false, eventId: '', channel: '' };
       }
-
-      const totalProcessingTime = Date.now() - startTime;
-      
-      // Preparar métricas de performance
-      performanceMetrics = {
-        totalProcessingTime,
-        validationTime,
-        networkLatency: totalProcessingTime - validationTime,
-        dataQualityScore: validation.score,
-        emqScore: emqResult.score,
-        emqFactors: emqResult.factors,
-        successRate: result ? 100 : 0,
-        errorRate: result ? 0 : 100,
-        eventsProcessed: 1,
-        eventsSuccessful: result ? 1 : 0,
-        eventsFailed: result ? 0 : 1
-      };
-
-      // Registrar performance
-      performanceMonitor.recordEventPerformance(
-        eventId, 
-        eventName, 
-        channel, 
-        result ? 'success' : 'failed', 
-        performanceMetrics,
-        result ? undefined : 'Event send failed'
-      );
 
       console.log(`📊 Resultado do envio único: ${eventName}`, {
         success: result,
         channel,
-        eventId,
-        validationScore: validation.score,
-        emqScore: emqResult.score.toFixed(2),
-        processingTime: totalProcessingTime
+        eventId
       });
 
-      return { success: result, eventId, channel, validation, performance: performanceMetrics };
+      return { success: result, eventId, channel };
 
     } catch (error) {
-      const totalProcessingTime = Date.now() - startTime;
       console.error(`❌ Erro crítico no EventManager para ${eventName}:`, error);
-      
-      // Registrar performance de erro crítico
-      performanceMonitor.recordEventPerformance('', eventName, this.config.primaryChannel, 'failed', {
-        totalProcessingTime,
-        dataQualityScore: 0,
-        emqScore: 0,
-        successRate: 0,
-        errorRate: 100
-      }, error.message);
-      
       return { success: false, eventId: '', channel: '' };
     } finally {
       console.groupEnd();
@@ -588,7 +344,7 @@ class EventManager {
   /**
    * Métodos utilitários
    */
-  public setPrimaryChannel(channel: 'gtm' | 'server' | 'fb' | 'gtm_server'): void {
+  public setPrimaryChannel(channel: 'gtm' | 'server' | 'fb'): void {
     this.config.primaryChannel = channel;
     console.log(`🔧 Canal primário alterado para: ${channel}`);
   }
@@ -607,33 +363,6 @@ class EventManager {
   public clearCache(): void {
     this.eventCache.clear();
     console.log('🧹 Cache do EventManager limpo completamente');
-  }
-
-  /**
-   * Obtém métricas de performance do sistema
-   */
-  public getPerformanceMetrics(): any {
-    return performanceMonitor.generatePerformanceReport();
-  }
-
-  /**
-   * Obtém métricas em tempo real
-   */
-  public getRealTimeMetrics(): any {
-    return performanceMonitor.getRealTimeMetrics();
-  }
-
-  /**
-   * Exporta todas as métricas para análise
-   */
-  public exportAllMetrics(): any {
-    return {
-      eventManager: {
-        cacheStats: this.getCacheStats(),
-        config: this.config
-      },
-      performance: performanceMonitor.exportMetrics()
-    };
   }
 }
 
