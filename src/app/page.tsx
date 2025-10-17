@@ -85,7 +85,7 @@ export default function App() {
     // Construir URL final rapidamente
     const finalUrlString = buildURLWithUTM(META_CONFIG.HOTMART.checkoutUrl, additionalParams);
     
-    // === CRÍTICO: Disparar initiate checkout de forma assíncrona sem bloquear ===
+    // === CRÍTICO: Disparar initiate checkout com controle de tempo ===
     try {
       // Capturar dados essenciais para rastreamento
       const { fbc, fbp } = getFacebookCookies();
@@ -107,35 +107,39 @@ export default function App() {
         utm_campaign: utmParams.utm_campaign
       };
 
-      console.log('🔥 Disparando initiate checkout de forma assíncrona...');
+      console.log('🔥 Iniciando tracking de checkout aprimorado...');
 
-      // Disparar evento de forma assíncrona NÃO BLOQUEANTE
-      if (typeof window !== 'undefined' && window.advancedTracking) {
-        // Usar Promise sem await para não bloquear o redirecionamento
-        window.advancedTracking.trackCheckout(userData)
-          .then(() => console.log('✅ Initiate checkout disparado com sucesso'))
-          .catch(error => console.log('Erro no rastreamento (não bloqueante):', error));
-      }
-
-      // Salvar dados para uso futuro de forma síncrona
+      // Usar nova função de tracking com controle de tempo
       if (typeof window !== 'undefined') {
-        const personalDataToSave = {
-          fn: userData.firstName,
-          ln: userData.lastName,
-          em: userData.email,
-          ph: userData.phone
-        };
-        localStorage.setItem('user_personal_data', JSON.stringify(personalDataToSave));
+        // Importar dinamicamente a função aprimorada
+        import('@/lib/enhanced-checkout-tracking').then(({ redirectToCheckoutWithTracking }) => {
+          // Salvar dados para uso futuro de forma síncrona
+          const personalDataToSave = {
+            fn: userData.firstName,
+            ln: userData.lastName,
+            em: userData.email,
+            ph: userData.phone
+          };
+          localStorage.setItem('user_personal_data', JSON.stringify(personalDataToSave));
+          
+          // Redirecionar com tracking garantido
+          redirectToCheckoutWithTracking(finalUrlString, userData);
+        }).catch(error => {
+          console.error('Erro ao importar tracking aprimorado:', error);
+          // Fallback para redirecionamento normal
+          window.location.href = finalUrlString;
+        });
+        
+        // Não fechar o modal imediatamente - deixar o fluxo controlar
+        return; // Sair da função sem fechar o modal
       }
 
     } catch (error) {
       console.log('Erro no rastreamento (continuando redirecionamento):', error);
     }
     
-    // Fechar modal e redirecionar IMEDIATAMENTE após o evento
+    // Fechar modal e redirecionar (fallback)
     setIsPreCheckoutModalOpen(false);
-    
-    // Redirecionar sem delay - o evento já foi enviado de forma síncrona
     window.location.href = finalUrlString;
   };
 
@@ -812,6 +816,14 @@ export default function App() {
                   target="_blank"
                 >
                   GTM Fix Test
+                </a>
+                <span className="text-green-400">•</span>
+                <a 
+                  href="/checkout-test" 
+                  className="text-green-200 hover:text-white underline text-xs"
+                  target="_blank"
+                >
+                  Checkout Test
                 </a>
               </div>
             </div>
