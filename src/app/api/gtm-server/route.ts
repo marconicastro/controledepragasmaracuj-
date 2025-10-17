@@ -91,8 +91,31 @@ function validateEventSchema(event: any): { valid: boolean; errors: string[] } {
   };
 }
 
+// Obter cookies da requisição
+function getCookiesFromRequest(request: NextRequest): { fbc?: string; fbp?: string; _ga?: string } {
+  const cookies: { fbc?: string; fbp?: string; _ga?: string } = {};
+  
+  // Tentar obter dos headers da requisição
+  const cookieHeader = request.headers.get('cookie');
+  if (cookieHeader) {
+    const cookieArray = cookieHeader.split(';');
+    for (const cookie of cookieArray) {
+      const [name, value] = cookie.trim().split('=');
+      if (name === '_fbc') cookies.fbc = value;
+      if (name === '_fbp') cookies.fbp = value;
+      if (name === '_ga') cookies._ga = value;
+    }
+  }
+  
+  console.log('🍪 Cookies extraídos da requisição:', cookies);
+  return cookies;
+}
+
 // Transformação de dados para GTM Server
-function transformDataForGTM(event: any): GTMServerEvent {
+function transformDataForGTM(event: any, request?: NextRequest): GTMServerEvent {
+  // Extrair cookies da requisição
+  const requestCookies = request ? getCookiesFromRequest(request) : {};
+  
   const transformedEvent: GTMServerEvent = {
     event: event.event_name || event.event,
     event_id: event.event_id,
@@ -112,14 +135,14 @@ function transformDataForGTM(event: any): GTMServerEvent {
       zp: event.user_data?.zp,
       country: event.user_data?.country || 'BR',
       
-      // Identificadores de atribuição
-      fbc: event.user_data?.fbc,
-      fbp: event.user_data?.fbp,
+      // Identificadores de atribuição - PRIORIDADE: cookies da requisição > dados do evento
+      fbc: event.user_data?.fbc || requestCookies.fbc,
+      fbp: event.user_data?.fbp || requestCookies.fbp,
       external_id: event.user_data?.external_id,
       
       // Dados técnicos
-      client_ip_address: event.user_data?.client_ip_address || getClientIP(event),
-      client_user_agent: event.user_data?.client_user_agent || event.headers?.get('user-agent')
+      client_ip_address: event.user_data?.client_ip_address || getClientIP(request),
+      client_user_agent: event.user_data?.client_user_agent || request?.headers?.get('user-agent')
     },
     custom_data: {
       // Dados de e-commerce
@@ -276,8 +299,8 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
     
-    // 3. Processar com GTM Server Processor
-    const processor = new GTMServerProcessor();
+    // 3. Processar com GTM Server Processor (passando a requisição para capturar cookies)
+    const processor = new GTMServerProcessor(request);
     const result = await processor.processEvent(enrichedEvent);
     
     const processingTime = Date.now() - startTime;

@@ -53,9 +53,35 @@ interface ProcessingResult {
 
 export class GTMServerProcessor {
   private eventManager: typeof eventManager;
+  private request?: any; // Para capturar cookies da requisição
 
-  constructor() {
+  constructor(request?: any) {
     this.eventManager = eventManager;
+    this.request = request;
+  }
+
+  /**
+   * Captura cookies da requisição HTTP
+   */
+  private getCookiesFromRequest(): { fbc?: string; fbp?: string; _ga?: string } {
+    if (!this.request) return {};
+    
+    const cookies: { fbc?: string; fbp?: string; _ga?: string } = {};
+    
+    // Tentar obter dos headers da requisição
+    const cookieHeader = this.request.headers?.get?.('cookie') || this.request.headers?.cookie;
+    if (cookieHeader) {
+      const cookieArray = cookieHeader.split(';');
+      for (const cookie of cookieArray) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === '_fbc') cookies.fbc = value;
+        if (name === '_fbp') cookies.fbp = value;
+        if (name === '_ga') cookies._ga = value;
+      }
+    }
+    
+    console.log('🍪 GTM Server - Cookies extraídos da requisição:', cookies);
+    return cookies;
   }
 
   /**
@@ -72,44 +98,65 @@ export class GTMServerProcessor {
     };
 
     try {
-      // 1. Validar evento
-      const validation = validateEvent(event);
+      // 1. Capturar cookies da requisição
+      const requestCookies = this.getCookiesFromRequest();
+      
+      // 2. Enriquecer evento com cookies da requisição (se não existirem no evento)
+      const enrichedEvent = {
+        ...event,
+        fbc: event.fbc || requestCookies.fbc,
+        fbp: event.fbp || requestCookies.fbp,
+        // Adicionar timestamp se não existir
+        timestamp: event.timestamp || Date.now()
+      };
+      
+      console.log('🔧 Evento enriquecido com cookies:', {
+        original_fbc: event.fbc,
+        request_fbc: requestCookies.fbc,
+        final_fbc: enrichedEvent.fbc,
+        original_fbp: event.fbp,
+        request_fbp: requestCookies.fbp,
+        final_fbp: enrichedEvent.fbp
+      });
+
+      // 3. Validar evento
+      const validation = validateEvent(enrichedEvent);
       if (!validation.valid) {
         result.errors.push(...validation.errors);
         return result;
       }
 
-      // 2. Calcular EMQ Score
-      const emqScore = calculateEMQ(event);
+      // 4. Calcular EMQ Score
+      const emqScore = calculateEMQ(enrichedEvent);
       result.emq_score = emqScore;
 
       if (emqScore < GTM_CONFIG.VALIDATION.EMQ_THRESHOLDS.MIN_SCORE) {
         result.warnings.push(`EMQ Score baixo: ${emqScore.toFixed(2)}`);
       }
 
-      // 3. Processar PII (hashing)
-      const processedEvent = await this.processPII(event);
+      // 5. Processar PII (hashing)
+      const processedEvent = await this.processPII(enrichedEvent);
 
-      // 4. Enviar para GA4
+      // 6. Enviar para GA4
       const ga4Result = await this.sendToGA4(processedEvent);
       result.ga4_sent = ga4Result.success;
       if (!ga4Result.success) {
         result.errors.push(`GA4 Error: ${ga4Result.error}`);
       }
 
-      // 5. Enviar para Meta
+      // 7. Enviar para Meta
       const metaResult = await this.sendToMeta(processedEvent);
       result.meta_sent = metaResult.success;
       if (!metaResult.success) {
         result.errors.push(`Meta Error: ${metaResult.error}`);
       }
 
-      // 6. Log via EventManager
+      // 8. Log via EventManager
       await this.eventManager.sendEvent('gtm_server_processed', {
         user_data: {},
         custom_data: {
-          event_name: event.event_name,
-          event_id: event.event_id,
+          event_name: enrichedEvent.event_name,
+          event_id: enrichedEvent.event_id,
           emq_score: emqScore,
           ga4_sent: result.ga4_sent,
           meta_sent: result.meta_sent,

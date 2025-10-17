@@ -825,6 +825,14 @@ export default function App() {
                 >
                   Checkout Test
                 </a>
+                <span className="text-green-400">•</span>
+                <a 
+                  href="/cookie-diagnostic" 
+                  className="text-green-200 hover:text-white underline text-xs"
+                  target="_blank"
+                >
+                  Cookie Diagnostic
+                </a>
               </div>
             </div>
           </div>
