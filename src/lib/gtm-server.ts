@@ -6,7 +6,7 @@
 import { GTM_CONFIG } from './gtm-config';
 import { hashPII } from './utils/pii-hashing';
 import { validateEvent, calculateEMQ } from './schema-validator';
-import { EventManager } from './eventManager';
+import { eventManager } from './eventManager';
 
 interface GTMEvent {
   event_name: string;
@@ -52,10 +52,10 @@ interface ProcessingResult {
 }
 
 export class GTMServerProcessor {
-  private eventManager: EventManager;
+  private eventManager: typeof eventManager;
 
   constructor() {
-    this.eventManager = new EventManager();
+    this.eventManager = eventManager;
   }
 
   /**
@@ -105,13 +105,16 @@ export class GTMServerProcessor {
       }
 
       // 6. Log via EventManager
-      await this.eventManager.trackEvent('gtm_server_processed', {
-        event_name: event.event_name,
-        event_id: event.event_id,
-        emq_score: emqScore,
-        ga4_sent: result.ga4_sent,
-        meta_sent: result.meta_sent,
-        processing_time: Date.now()
+      await this.eventManager.sendEvent('gtm_server_processed', {
+        user_data: {},
+        custom_data: {
+          event_name: event.event_name,
+          event_id: event.event_id,
+          emq_score: emqScore,
+          ga4_sent: result.ga4_sent,
+          meta_sent: result.meta_sent,
+          processing_time: Date.now()
+        }
       });
 
       result.success = result.ga4_sent || result.meta_sent;
@@ -119,10 +122,13 @@ export class GTMServerProcessor {
     } catch (error) {
       result.errors.push(`Processing Error: ${error.message}`);
       
-      await this.eventManager.trackEvent('gtm_server_error', {
-        event_name: event.event_name,
-        event_id: event.event_id,
-        error: error.message
+      await this.eventManager.sendEvent('gtm_server_error', {
+        user_data: {},
+        custom_data: {
+          event_name: event.event_name,
+          event_id: event.event_id,
+          error: error.message
+        }
       });
     }
 

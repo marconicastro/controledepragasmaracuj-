@@ -36,11 +36,53 @@ const trackViewContent = async (viewContentHasBeenTracked: any) => {
     external_id: trackingParams.external_id
   };
 
-  // Enviar via EventManager
+  // 📊 ENVIAR EVENTOS COM ESTRUTURA CORRETA PARA GTM
+  const eventId = `viewcontent_${Date.now()}_gtm`;
+  
+  // 1. Evento view_item para GA4
+  if (typeof window !== 'undefined' && window.dataLayer) {
+    window.dataLayer.push({
+      event: 'view_item',
+      event_id: eventId,
+      ecommerce: {
+        currency: 'BRL',
+        value: 39.90,
+        items: [{
+          item_id: 'ebook-controle-trips',
+          item_name: 'E-book Sistema de Controle de Trips',
+          category: 'E-book',
+          price: 39.90,
+          quantity: 1
+        }]
+      },
+      user_data: userData,
+      timestamp: new Date().toISOString()
+    });
+    console.log('✅ view_item enviado para GTM com estrutura ecommerce');
+  }
+
+  // 2. Evento ViewContent para Meta
+  if (typeof window !== 'undefined' && window.dataLayer) {
+    window.dataLayer.push({
+      event: 'ViewContent',
+      event_id: `${eventId}_meta`,
+      content_name: 'E-book Sistema de Controle de Trips',
+      content_category: 'E-book',
+      content_ids: ['ebook-controle-trips'],
+      content_type: 'product',
+      value: 39.90,
+      currency: 'BRL',
+      user_data: userData,
+      timestamp: new Date().toISOString()
+    });
+    console.log('✅ ViewContent enviado para GTM com estrutura Meta');
+  }
+
+  // Enviar via EventManager (server-side)
   const result = await eventManager.sendViewContent(userData);
   
   if (result.success) {
-    console.log('✅ ViewContent enviado com sucesso (canal único):', result);
+    console.log('✅ ViewContent enviado com sucesso (todos os canais):', result);
     viewContentHasBeenTracked.current = true;
   } else {
     console.error('❌ Falha ao enviar ViewContent');
@@ -94,11 +136,53 @@ export const trackCheckout = async (userData: any) => {
 
   console.log('📊 Dados formatados:', formattedUserData);
 
-  // Enviar via EventManager
+  // 📊 ENVIAR EVENTOS COM ESTRUTURA CORRETA PARA GTM
+  const eventId = `checkout_${Date.now()}_gtm`;
+  
+  // 1. Evento begin_checkout para GA4
+  if (typeof window !== 'undefined' && window.dataLayer) {
+    window.dataLayer.push({
+      event: 'begin_checkout',
+      event_id: eventId,
+      ecommerce: {
+        currency: 'BRL',
+        value: 39.90,
+        items: [{
+          item_id: 'ebook-controle-trips',
+          item_name: 'E-book Sistema de Controle de Trips',
+          category: 'E-book',
+          price: 39.90,
+          quantity: 1
+        }]
+      },
+      user_data: formattedUserData,
+      timestamp: new Date().toISOString()
+    });
+    console.log('✅ begin_checkout enviado para GTM com estrutura ecommerce');
+  }
+
+  // 2. Evento InitiateCheckout para Meta
+  if (typeof window !== 'undefined' && window.dataLayer) {
+    window.dataLayer.push({
+      event: 'InitiateCheckout',
+      event_id: `${eventId}_meta`,
+      content_name: 'E-book Sistema de Controle de Trips',
+      content_category: 'E-book',
+      content_ids: ['ebook-controle-trips'],
+      content_type: 'product',
+      value: 39.90,
+      currency: 'BRL',
+      user_data: formattedUserData,
+      timestamp: new Date().toISOString()
+    });
+    console.log('✅ InitiateCheckout enviado para GTM com estrutura Meta');
+  }
+
+  // Enviar via EventManager (server-side)
   const result = await eventManager.sendInitiateCheckout(formattedUserData);
   
   if (result.success) {
-    console.log('✅ InitiateCheckout enviado com sucesso (canal único):', result);
+    console.log('✅ InitiateCheckout enviado com sucesso (todos os canais):', result);
   } else {
     console.error('❌ Falha ao enviar InitiateCheckout');
   }
@@ -284,16 +368,184 @@ export default function AdvancedTracking() {
           }
         },
         // Função para testar captura de fbclid
-        testFbclidCapture: () => {
-          console.log('🧪 Testando captura de fbclid...');
-          captureFbclid();
+        // Função para testar todos os eventos
+        testAllEvents: () => {
+          console.log('🧪 Iniciando teste completo de todos os eventos...');
+          
+          // 1. Testar PageView
+          console.log('1️⃣ Testando PageView...');
+          if (typeof window !== 'undefined' && window.dataLayer) {
+            const pageViewEvent = {
+              event: 'page_view',
+              event_id: `pageview_test_${Date.now()}_gtm`,
+              page_title: document.title,
+              page_location: window.location.href,
+              page_referrer: document.referrer,
+              test_mode: true,
+              timestamp: new Date().toISOString()
+            };
+            window.dataLayer.push(pageViewEvent);
+            console.log('✅ PageView de teste enviado');
+          }
+          
+          // 2. Testar view_item (GA4)
           setTimeout(() => {
-            const { fbc, fbp } = getFacebookCookies();
-            console.log('📊 Resultado após teste:');
-            console.log('- _fbc:', fbc || '❌ Não capturado');
-            console.log('- _fbp:', fbp || '❌ Não capturado');
-          }, 200);
-        }
+            console.log('2️⃣ Testando view_item (GA4)...');
+            if (typeof window !== 'undefined' && window.dataLayer) {
+              const viewItemEvent = {
+                event: 'view_item',
+                event_id: `viewitem_test_${Date.now()}_gtm`,
+                user_data: {
+                  em: 'teste@email.com',
+                  ph: '11999999999'
+                },
+                custom_data: {
+                  value: 39.90,
+                  currency: 'BRL',
+                  content_name: 'E-book Sistema de Controle de Trips',
+                  content_category: 'E-book'
+                },
+                test_mode: true,
+                timestamp: new Date().toISOString()
+              };
+              window.dataLayer.push(viewItemEvent);
+              console.log('✅ view_item de teste enviado');
+            }
+          }, 1000);
+          
+          // 3. Testar ViewContent (Meta)
+          setTimeout(() => {
+            console.log('3️⃣ Testando ViewContent (Meta)...');
+            if (typeof window !== 'undefined' && window.dataLayer) {
+              const viewContentEvent = {
+                event: 'ViewContent',
+                event_id: `viewcontent_test_${Date.now()}_gtm`,
+                user_data: {
+                  em: 'teste@email.com',
+                  ph: '11999999999'
+                },
+                custom_data: {
+                  value: 39.90,
+                  currency: 'BRL',
+                  content_name: 'E-book Sistema de Controle de Trips',
+                  content_category: 'E-book'
+                },
+                test_mode: true,
+                timestamp: new Date().toISOString()
+              };
+              window.dataLayer.push(viewContentEvent);
+              console.log('✅ ViewContent de teste enviado');
+            }
+          }, 2000);
+          
+          // 4. Testar begin_checkout (GA4)
+          setTimeout(() => {
+            console.log('4️⃣ Testando begin_checkout (GA4)...');
+            if (typeof window !== 'undefined' && window.dataLayer) {
+              const beginCheckoutEvent = {
+                event: 'begin_checkout',
+                event_id: `begincheckout_test_${Date.now()}_gtm`,
+                user_data: {
+                  em: 'teste@email.com',
+                  ph: '11999999999',
+                  fn: 'Teste',
+                  ln: 'Usuario'
+                },
+                custom_data: {
+                  value: 39.90,
+                  currency: 'BRL',
+                  content_name: 'E-book Sistema de Controle de Trips',
+                  content_category: 'E-book'
+                },
+                test_mode: true,
+                timestamp: new Date().toISOString()
+              };
+              window.dataLayer.push(beginCheckoutEvent);
+              console.log('✅ begin_checkout de teste enviado');
+            }
+          }, 3000);
+          
+          // 5. Testar InitiateCheckout (Meta)
+          setTimeout(() => {
+            console.log('5️⃣ Testando InitiateCheckout (Meta)...');
+            if (typeof window !== 'undefined' && window.dataLayer) {
+              const initiateCheckoutEvent = {
+                event: 'InitiateCheckout',
+                event_id: `initiatecheckout_test_${Date.now()}_gtm`,
+                user_data: {
+                  em: 'teste@email.com',
+                  ph: '11999999999',
+                  fn: 'Teste',
+                  ln: 'Usuario'
+                },
+                custom_data: {
+                  value: 39.90,
+                  currency: 'BRL',
+                  content_name: 'E-book Sistema de Controle de Trips',
+                  content_category: 'E-book'
+                },
+                test_mode: true,
+                timestamp: new Date().toISOString()
+              };
+              window.dataLayer.push(initiateCheckoutEvent);
+              console.log('✅ InitiateCheckout de teste enviado');
+            }
+          }, 4000);
+          
+          // 6. Testar view_content (GTM Server)
+          setTimeout(() => {
+            console.log('6️⃣ Testando view_content (GTM Server)...');
+            if (typeof window !== 'undefined' && window.dataLayer) {
+              const viewContentServerEvent = {
+                event: 'view_content',
+                event_id: `viewcontent_server_test_${Date.now()}_gtm`,
+                user_data: {
+                  em: 'teste@email.com',
+                  ph: '11999999999'
+                },
+                custom_data: {
+                  value: 39.90,
+                  currency: 'BRL',
+                  content_name: 'E-book Sistema de Controle de Trips',
+                  content_category: 'E-book'
+                },
+                test_mode: true,
+                timestamp: new Date().toISOString()
+              };
+              window.dataLayer.push(viewContentServerEvent);
+              console.log('✅ view_content (GTM Server) de teste enviado');
+            }
+          }, 5000);
+          
+          // 7. Testar initiate_checkout (GTM Server)
+          setTimeout(() => {
+            console.log('7️⃣ Testando initiate_checkout (GTM Server)...');
+            if (typeof window !== 'undefined' && window.dataLayer) {
+              const initiateCheckoutServerEvent = {
+                event: 'initiate_checkout',
+                event_id: `initiatecheckout_server_test_${Date.now()}_gtm`,
+                user_data: {
+                  em: 'teste@email.com',
+                  ph: '11999999999',
+                  fn: 'Teste',
+                  ln: 'Usuario'
+                },
+                custom_data: {
+                  value: 39.90,
+                  currency: 'BRL',
+                  content_name: 'E-book Sistema de Controle de Trips',
+                  content_category: 'E-book'
+                },
+                test_mode: true,
+                timestamp: new Date().toISOString()
+              };
+              window.dataLayer.push(initiateCheckoutServerEvent);
+              console.log('✅ initiate_checkout (GTM Server) de teste enviado');
+            }
+            
+            console.log('🎉 Teste completo finalizado! Verifique o Google Tag Assistant.');
+          }, 6000);
+        },
       };
     }
 
@@ -318,6 +570,7 @@ declare global {
       testCheckout: () => void;
       testViewContent: () => void;
       testPageView: () => void;
+      testAllEvents: () => void;
       checkTrackingStatus: () => void;
       testFbclidCapture: () => void;
     };

@@ -138,6 +138,19 @@ class EventManager {
 
       window.dataLayer.push(eventData);
       
+      // Enviar também eventos Meta para GTM
+      const metaEventName = this.mapToFacebookEventName(eventName);
+      const metaEventData = {
+        event: metaEventName,
+        event_id: eventId,
+        user_data: data.user_data,
+        custom_data: data.custom_data,
+        timestamp: new Date().toISOString()
+      };
+      
+      window.dataLayer.push(metaEventData);
+      console.log(`✅ Evento Meta também enviado para GTM: ${metaEventName}`);
+      
       // Enviar também evento específico para GA4 se disponível
       if (typeof window.gtag !== 'undefined') {
         const ga4EventName = this.mapToGA4EventName(eventName);
@@ -257,6 +270,7 @@ class EventManager {
     return {
       event_name: eventName,
       event_id: eventId,
+      timestamp: Date.now(), // ← Adicionando timestamp obrigatório
       session_id: this.generateSessionId(),
       user_data: {
         // Dados PII
@@ -332,8 +346,8 @@ class EventManager {
 
   private mapToStandardEventName(internalEventName: string): string {
     const eventMapping: { [key: string]: string } = {
-      'view_content': 'view_content',
-      'initiate_checkout': 'initiate_checkout',
+      'view_content': 'view_item',        // Mapeado para GA4 view_item
+      'initiate_checkout': 'begin_checkout', // Mapeado para GA4 begin_checkout
       'PageView': 'page_view'
     };
 
@@ -391,7 +405,8 @@ class EventManager {
         event_id: eventId,
         user_data: data.user_data,
         custom_data: data.custom_data,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        session_id: this.generateSessionId()
       };
       
       // 1. Validação rápida
