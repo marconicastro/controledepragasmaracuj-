@@ -260,8 +260,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     console.log(`📊 [${requestId}] Evento recebido:`, JSON.stringify(body, null, 2));
     
-    // 1. Validar e enriquecer evento
-    const validation = validateEvent(body);
+    // 1. Enriquecer evento primeiro (adicionar timestamp se não existir)
+    const enrichedEvent = enrichEvent(body);
+    
+    // 2. Validar evento enriquecido
+    const validation = validateEvent(enrichedEvent);
     if (!validation.valid) {
       console.error(`❌ [${requestId}] Evento inválido:`, validation.errors);
       return NextResponse.json({
@@ -273,10 +276,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
     
-    // Enriquecer evento com dados adicionais
-    const enrichedEvent = enrichEvent(body);
-    
-    // 2. Processar com GTM Server Processor
+    // 3. Processar com GTM Server Processor
     const processor = new GTMServerProcessor();
     const result = await processor.processEvent(enrichedEvent);
     

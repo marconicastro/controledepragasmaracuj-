@@ -747,7 +747,7 @@ export default function App() {
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-8 text-xs sm:text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-8 text-xs sm:text-sm mb-4 sm:mb-6">
               <div>
                 <h4 className="font-bold mb-1 sm:mb-2">📞 Contato</h4>
                 <p className="text-green-200">maracujalucrativo@gmail.com</p>
@@ -759,6 +759,60 @@ export default function App() {
               <div>
                 <h4 className="font-bold mb-1 sm:mb-2">📋 Políticas</h4>
                 <p className="text-green-200">Termos • Privacidade • Reembolso</p>
+              </div>
+            </div>
+            
+            {/* Ferramentas de Diagnóstico - Apenas para desenvolvimento */}
+            <div className="border-t border-green-700 pt-4 mt-4">
+              <h4 className="font-bold mb-2 text-green-200">🔧 Ferramentas de Diagnóstico</h4>
+              <div className="flex flex-wrap gap-2 justify-center">
+                <a 
+                  href="/debug" 
+                  className="text-green-200 hover:text-white underline text-xs"
+                  target="_blank"
+                >
+                  Debug Dashboard
+                </a>
+                <span className="text-green-400">•</span>
+                <a 
+                  href="/gtm-validator" 
+                  className="text-green-200 hover:text-white underline text-xs"
+                  target="_blank"
+                >
+                  GTM Validator
+                </a>
+                <span className="text-green-400">•</span>
+                <a 
+                  href="/trigger-diagnostic" 
+                  className="text-green-200 hover:text-white underline text-xs"
+                  target="_blank"
+                >
+                  Trigger Diagnostic
+                </a>
+                <span className="text-green-400">•</span>
+                <a 
+                  href="/test-tracking" 
+                  className="text-green-200 hover:text-white underline text-xs"
+                  target="_blank"
+                >
+                  Test Tracking
+                </a>
+                <span className="text-green-400">•</span>
+                <a 
+                  href="/deep-diagnostic" 
+                  className="text-green-200 hover:text-white underline text-xs"
+                  target="_blank"
+                >
+                  Deep Diagnostic
+                </a>
+                <span className="text-green-400">•</span>
+                <a 
+                  href="/gtm-fix-test" 
+                  className="text-green-200 hover:text-white underline text-xs"
+                  target="_blank"
+                >
+                  GTM Fix Test
+                </a>
               </div>
             </div>
           </div>

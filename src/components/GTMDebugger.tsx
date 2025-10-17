@@ -102,17 +102,17 @@ export default function GTMDebugger() {
       case 'ViewContent':
         eventData.content_name = 'E-book Sistema de Controle de Trips';
         eventData.content_category = 'E-book';
-        eventData.content_ids: ['ebook-controle-trips'];
-        eventData.content_type: 'product';
-        eventData.value: 39.90;
-        eventData.currency: 'BRL';
+        eventData.content_ids = ['ebook-controle-trips'];
+        eventData.content_type = 'product';
+        eventData.value = 39.90;
+        eventData.currency = 'BRL';
         break;
       
       case 'InitiateCheckout':
         eventData.content_name = 'E-book Sistema de Controle de Trips';
-        eventData.content_category: 'E-book';
-        eventData.value: 39.90;
-        eventData.currency: 'BRL';
+        eventData.content_category = 'E-book';
+        eventData.value = 39.90;
+        eventData.currency = 'BRL';
         break;
     }
 
