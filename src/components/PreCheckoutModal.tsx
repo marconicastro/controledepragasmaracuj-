@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Shield, CreditCard, User, Mail, Phone } from 'lucide-react';
-import { useGTM } from '@/hooks/useGTM';
 
 // Schema de validação do formulário
 const checkoutFormSchema = z.object({
@@ -43,7 +42,6 @@ interface PreCheckoutModalProps {
 
 export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheckoutModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { trackFormSubmit, trackCheckoutInitiated, trackButtonClick } = useGTM();
 
   const {
     register,
@@ -93,19 +91,6 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
     setIsSubmitting(true);
     
     try {
-      // Track de início de checkout
-      trackCheckoutInitiated({
-        fullName: data.fullName,
-        email: data.email,
-        phone: data.phone,
-      });
-      
-      // Track de envio de formulário
-      trackFormSubmit('pre_checkout_form', {
-        form_fields: ['fullName', 'email', 'phone'],
-        has_phone: true,
-      });
-      
       await onSubmit(data);
       reset();
     } catch (error) {
@@ -119,11 +104,8 @@ export default function PreCheckoutModal({ isOpen, onClose, onSubmit }: PreCheck
   React.useEffect(() => {
     if (!isOpen) {
       reset();
-    } else {
-      // Track quando o modal é aberto
-      trackButtonClick('Abrir Modal Checkout', 'pre_checkout_modal');
     }
-  }, [isOpen, reset, trackButtonClick]);
+  }, [isOpen, reset]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
